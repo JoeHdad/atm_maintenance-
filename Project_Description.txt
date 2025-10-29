@@ -1,0 +1,343 @@
+Prompt:
+
+You are an expert full-stack developer.
+Build a complete ATM Maintenance Management System using React (frontend) and Django (backend) with a PostgreSQL database.
+Follow this specification precisely — no assumptions, no omissions, no hallucinations.
+All interface text must be in English.
+Use clean, modern responsive UI (Tailwind CSS or Material UI).
+Organize the project into three roles: Data Host, Technician, and Supervisor.
+
+🔧 General System Overview
+
+The website must manage maintenance operations for ATMs across multiple Saudi cities.
+There are three separate dashboards (login-based):
+
+Data Host Dashboard — for uploading Excel files and creating technician accounts.
+
+Technician Dashboard — for logging visits, uploading photos, and submitting reports.
+
+Supervisor Dashboard — for reviewing submissions, approving/rejecting them, and generating final PDF reports that are automatically emailed.
+
+Authentication uses JWT tokens and role-based access control.
+
+🧩 DATABASE SCHEMA (Use PostgreSQL)
+
+Design normalized tables as follows:
+
+User
+
+id (PK)
+
+username (unique)
+
+password (hash)
+
+role (enum: "host", "technician", "supervisor")
+
+city (nullable for host/supervisor)
+
+created_at
+
+Device
+
+id (PK)
+
+interaction_id (string)
+
+gfm_cost_center (string)
+
+status (string)
+
+gfm_problem_type (string)
+
+gfm_problem_date (date)
+
+city (string)
+
+region (string)
+
+type (enum: "Cleaning", "Electrical")
+
+created_at
+
+TechnicianDevice
+
+id (PK)
+
+technician (FK→User)
+
+device (FK→Device)
+
+Submission
+
+id (PK)
+
+technician (FK→User)
+
+device (FK→Device)
+
+type (enum: "Cleaning", "Electrical")
+
+visit_date (date)
+
+half_month (integer: 1 or 2)
+
+status (enum: "Pending", "Approved", "Rejected")
+
+pdf_url (string, nullable)
+
+remarks (text, nullable)
+
+created_at
+
+Photo
+
+id (PK)
+
+submission (FK→Submission)
+
+section (integer: 1, 2, or 3)
+
+file_url (string)
+
+order_index (integer)
+
+🧠 BUSINESS LOGIC RULES
+
+Data Host:
+
+Can create technician accounts (username, password, city).
+
+Can upload one Excel file per technician per month.
+
+The Excel file replaces previous data entirely (not incremental).
+
+Excel columns are always fixed:
+Interaction ID, Gfm cost Center, Status, Gfm Problem Type, Gfm Problem Date.
+
+The system imports these rows as Devices, linked to the technician’s city.
+
+Technician:
+
+Logs in using provided username/password.
+
+Sees only their own city and devices.
+
+Devices are grouped by Type (Cleaning or Electrical).
+
+For Cleaning: two visits per month (1-14 and 15-28).
+
+For Electrical: one visit per month.
+
+When a device is selected, all info from the Excel file appears.
+
+A button “Add Visit” opens a form to upload photos.
+
+The technician is required to upload all 8 photos before submitting:
+
+Section 1: 3 photos (machine + pylon, 3–5 meters away).
+
+Section 2: 3 photos (zoomed front + back, 3–5 meters).
+
+Section 3: 2 photos (asphalt + pavement with security column).
+
+After all 8 photos are uploaded, technician clicks Submit.
+
+Submission automatically includes:
+
+Photos (stored by section).
+
+Table of static fields (Job Description + Status + Remarks).
+
+Device metadata: ATM number, Type, Region, City, Interaction ID, Date (today).
+
+Cannot submit twice for the same device + same half_month.
+
+Supervisor:
+
+Logs in and sees all submissions with filters (Pending/Approved/Rejected, City, Technician, Date).
+
+Can view all uploaded photos and data.
+
+Can Approve or Reject each submission.
+
+Upon Approval:
+
+The system generates a PDF report matching a fixed template (see attached example).
+
+PDF name format: gfm{interaction_id}_{half_month}.pdf.
+
+PDF contains:
+
+Updated ATM number and today’s date on page 1.
+
+The same layout and content as the template.
+
+Technician name and submission date printed (signature style, no digital signature).
+
+PDF is saved to the server and automatically emailed to these recipients:
+
+269305@alahli.com
+
+sohail.alamoudi@amnwwafaa.com
+
+m.ishtiaq@aroundh-ksa.com
+
+272923@alahli.com
+
+Upon Rejection: supervisor can add remarks; submission status = “Rejected”.
+
+📄 PDF GENERATION
+
+Use xhtml2pdf or reportlab on Django side.
+
+Match exactly the provided template layout (838 CL1[1].pdf).
+
+Update only two dynamic fields:
+
+ATM number
+
+Date (today)
+
+All other content remains fixed.
+
+Store generated PDF file and record its URL in the Submission table.
+
+📤 EMAIL DELIVERY
+
+Use Django EmailBackend (SMTP configurable).
+
+When supervisor approves submission, attach PDF and send it to the four emails above.
+
+Subject example: ATM Cleaning Report – GFM1190544 – Half 1.
+
+Body includes basic info: ATM ID, City, Technician, Date.
+
+💾 FILE HANDLING
+
+Store photos and PDFs in /media/ folder (when local),
+later migratable to S3 or cloud storage.
+
+Validate photo types (jpg, jpeg, png) and max size (10 MB).
+
+Keep original resolution + compressed preview.
+
+🖥️ FRONTEND (React)
+
+Use React + Tailwind CSS (English UI).
+Three main dashboards with role-based routing.
+
+1️⃣ Data Host Dashboard
+
+Create Technician (User) form (username, password, city).
+
+Upload Excel file (per technician).
+
+After upload, parse and show imported rows summary.
+
+Button to “Replace Previous Data” confirms overwriting.
+
+2️⃣ Technician Dashboard
+
+Device List screen:
+
+Filters: Type (Cleaning / Electrical), Status.
+
+Each row shows Interaction ID + Status + Next Due Date.
+
+On clicking device:
+
+Display full details from Excel.
+
+Button “Add Visit” opens photo upload form.
+
+Photo Upload screen:
+
+Section 1 (3 inputs) + Section 2 (3) + Section 3 (2).
+
+Live preview of each photo.
+
+Submit button disabled until all 8 photos are uploaded.
+
+On Submit:
+
+POST photos + data to backend.
+
+Show success confirmation.
+
+3️⃣ Supervisor Dashboard
+
+Table of submissions with filters.
+
+Click submission → detail view with photos grouped by section.
+
+Buttons: Approve / Reject.
+
+On Approve:
+
+Generate PDF + Send Emails.
+
+On Reject:
+
+Prompt for remarks → update status = Rejected.
+
+⚙️ BACKEND APIs (Examples)
+
+POST /api/auth/login → returns JWT token
+POST /api/host/technicians → create technician
+POST /api/host/upload-excel → upload and replace devices
+GET /api/technician/devices → list devices assigned
+POST /api/technician/submit → upload photos + data
+GET /api/supervisor/submissions → list all submissions
+PATCH /api/supervisor/submissions/{id} → approve/reject submission
+GET /api/submissions/{id}/pdf → download generated pdf
+
+Use JWT authorization header for all protected routes.
+
+🧱 DEPLOYMENT & CONFIG
+
+Development target: Localhost only for now.
+
+Static files served via Django.
+
+React build served on /frontend/.
+
+Environment variables for DB and SMTP.
+
+✅ VALIDATION & SECURITY
+
+Enforce unique Interaction IDs.
+
+Prevent duplicate submission for same device and half_month.
+
+Hash passwords using Django auth model.
+
+Validate uploaded Excel columns and rows.
+
+Validate photo count (3+3+2) before allowing submission.
+
+📊 OPTIONAL EXTRAS (if time permits)
+
+Dashboard summary: total submissions, pending count, approved count per city.
+
+Export Excel report for Supervisor.
+
+Search and filter for technicians/devices.
+
+🎯 Final Deliverables
+
+A fully functional React + Django web app with:
+
+Role-based login system.
+
+Excel import and data management.
+
+Technician photo upload and submission workflow.
+
+Supervisor review + PDF generation + automatic email dispatch.
+
+Clean UI and consistent English labels.
+
+Works on localhost without external dependencies.
+
+End of Prompt.

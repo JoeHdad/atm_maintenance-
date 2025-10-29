@@ -1,0 +1,76 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Django specific
+local_settings.py
+settings_local.py
+staticfiles/
+media/
+backend/static/
+backend/staticfiles/
+backend/media/
+backend/logs/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Tests
+.coverage
+htmlcov/
+.pytest_cache/
+
+tmp/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Jupyter
+.ipynb_checkpoints
+
+# VS Code & IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node / React
+node_modules/
+.npm/
+yarn-error.log
+yarn-debug.log*
+npm-debug.log*
+package-lock.json
+pnp.*
+.babelrc
+.cache/
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+public/static/
+coverage/
+
+# Environment files
+*.env
+.env.*
+
+# Storybook
+storybook-static/
+
+# Misc
+*~
+*.swp
+*.swo

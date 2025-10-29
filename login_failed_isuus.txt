@@ -1,0 +1,131 @@
+You are an AI Code Inspector and Quality Assurance Agent.
+
+Your mission is to **systematically verify and test every potential cause** behind the login system showing “failed” even with correct credentials — as previously analyzed.
+
+⚠️ Rules:
+- Do NOT modify the production code.
+- Work only in testing or diagnostic mode.
+- Log all findings in a clear, structured report.
+- Provide direct evidence (test case results, printed outputs, or inspection results) for each check.
+- At the end, summarize the most probable cause(s) with technical justification.
+
+---
+
+## 🔸 STAGE 1 — BACKEND AUTHENTICATION LOGIC
+**Goal:** Verify that backend authentication logic actually validates correct credentials.
+
+**Tasks:**
+1. Locate `LoginSerializer` in `backend/core/serializers.py`.
+2. Run isolated tests on the `authenticate()` function:
+   - Input: existing username and correct password.
+   - Expected Output: valid user object.
+   - Record what the function actually returns.
+3. Check for `user.is_active` condition in serializer or view logic.
+4. Verify the password hash comparison is working (use Django `check_password`).
+5. Log whether authentication succeeds internally before response generation.
+
+**Deliverable:** Confirmation that correct credentials pass authentication successfully in backend logic.
+
+---
+
+## 🔸 STAGE 2 — FRONTEND–BACKEND COMMUNICATION
+**Goal:** Ensure that API requests are correctly reaching the backend and receiving the expected response.
+
+**Tasks:**
+1. Inspect `frontend/atm_frontend/src/api/auth.js`:
+   - Validate that `authAPI.login()` calls the correct endpoint URL.
+   - Log the full Axios request path and payload.
+2. Test the request manually (e.g., using fetch or Axios test) to confirm the backend returns a proper JSON response.
+3. Check for proxy or CORS errors in browser console or dev logs.
+4. Log the exact HTTP status code and raw JSON returned by the backend.
+
+**Deliverable:** A clear confirmation of whether the frontend is communicating properly with the backend and what the backend actually responds with.
+
+---
+
+## 🔸 STAGE 3 — ERROR HANDLING & RESPONSE PARSING
+**Goal:** Validate frontend logic in interpreting backend responses.
+
+**Tasks:**
+1. Inspect `AuthContext.jsx` (lines 34–75).
+2. Run a controlled login attempt with:
+   - Correct credentials.
+   - Wrong credentials.
+3. Log how the frontend handles each case.
+4. Trace if it always shows “failed” even when backend responds with 200 or 201.
+5. Identify any incorrect condition (like `if (!response.data.token)` leading to “failed”).
+
+**Deliverable:** Evidence of whether frontend misreads success responses or overwrites backend messages.
+
+---
+
+## 🔸 STAGE 4 — DATABASE & MIGRATIONS VALIDITY
+**Goal:** Ensure users and authentication tables are valid.
+
+**Tasks:**
+1. Run `python manage.py showmigrations` and confirm all are applied.
+2. Connect to the database and query:
+   ```sql
+   SELECT username, is_active FROM auth_user;
+Validate that at least one user exists with known credentials.
+
+Check that the user’s password field is hashed properly.
+
+Confirm no database corruption or missing tables.
+
+Deliverable: Proof that the database and user data are intact and accessible.
+
+🔸 STAGE 5 — FRONTEND STATE MANAGEMENT & TOKEN HANDLING
+Goal: Verify that the frontend correctly saves and recognizes authenticated state.
+
+Tasks:
+
+Inspect AuthContext.jsx for token save logic (e.g., localStorage.setItem()).
+
+Perform login → check if token is actually saved.
+
+Perform refresh or navigation → verify token is still valid.
+
+Log whether the app reverts to “failed” despite receiving a token.
+
+Deliverable: Verification that authentication state persists correctly on frontend after successful login.
+
+🔸 STAGE 6 — CONFIGURATION & ROUTING
+Goal: Confirm environment variables and routing are aligned across frontend & backend.
+
+Tasks:
+
+Check .env or .env.local for:
+
+nginx
+Copy code
+REACT_APP_API_URL
+Ensure it matches Django server URL.
+
+Inspect Django’s urls.py to confirm /api/auth/login/ is routed properly.
+
+Test direct access via Postman or curl:
+
+bash
+Copy code
+POST http://localhost:8000/api/auth/login/
+Log backend status code and body.
+
+Deliverable: Confirmation that configuration and routing are correct end-to-end.
+
+🔸 FINAL REPORT FORMAT
+At the end of all checks, produce:
+
+✅ Working components: list with evidence.
+
+⚠️ Broken components: list with technical reason.
+
+🔍 Probable root cause(s): ranked by confidence.
+
+📄 Recommendations: next debugging or fixing steps.
+
+Reminder: You are not fixing or editing.
+You are verifying, testing, and reporting with absolute technical accuracy.
+
+yaml
+Copy code

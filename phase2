@@ -1,0 +1,173 @@
+**PHASE 2: DATA HOST FEATURES**
+
+#### **Feature 2.1: Create Technician Account (Backend)**
+**Purpose**: API endpoint for Data Host to create technician users.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/api-endpoints.md and /instructions/security-guidelines.md.
+
+Create backend endpoint for Data Host to create technician accounts.
+
+Requirements:
+1. Endpoint: POST /api/host/technicians
+2. Permission: IsDataHost only
+3. Input fields:
+   - username (unique, alphanumeric)
+   - password (min 8 characters)
+   - city (required)
+4. Validation:
+   - Check username uniqueness
+   - Hash password before saving
+   - Validate city format
+5. Output: Created technician object (exclude password)
+
+⚠️ Do NOT add Excel upload logic here.
+⚠️ Do NOT modify User model.
+Only create the technician creation endpoint.
+
+Output: views.py, serializers.py, urls.py
+```
+
+---
+
+#### **Feature 2.2: Create Technician Account (Frontend)**
+**Purpose**: UI form for Data Host to create technician accounts.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create React component for Data Host to create technician accounts.
+
+Requirements:
+1. Create TechnicianForm component
+   - Input fields: username, password, confirm password, city (dropdown)
+   - City options: Riyadh, Jeddah, Dammam, Mecca, Medina, Al-Baha, Tabuk
+   - Password strength indicator
+   - Form validation (client-side)
+2. Submit to POST /api/host/technicians
+3. Success/error message display
+4. Clear form after successful creation
+
+Styling: Clean, modern Tailwind CSS form layout
+
+⚠️ Do NOT create the full Data Host dashboard yet.
+⚠️ Do NOT add Excel upload UI here.
+Only the technician creation form component.
+
+Output: TechnicianForm.jsx, api/host.js
+```
+
+---
+
+#### **Feature 2.3: Excel Upload & Parse (Backend)**
+**Purpose**: API endpoint to upload Excel file and create/replace devices for a technician.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/database-schema.md and /instructions/security-guidelines.md.
+
+Create backend endpoint for Data Host to upload Excel file with device data.
+
+Requirements:
+1. Endpoint: POST /api/host/upload-excel
+2. Permission: IsDataHost only
+3. Input:
+   - Excel file (multipart/form-data)
+   - technician_id
+   - device_type (Cleaning or Electrical)
+4. Excel columns (fixed order):
+   - Interaction ID
+   - Gfm cost Center
+   - Status (maps to region field)
+   - Gfm Problem Type
+   - Gfm Problem Date
+5. Logic:
+   - Parse Excel using openpyxl
+   - Validate all columns exist
+   - Delete all existing devices for this technician (REPLACE, not append)
+   - Create new Device records
+   - Link devices to technician via TechnicianDevice
+   - Extract city from technician record
+6. Output: Summary (total rows imported, errors if any)
+
+Validation:
+- Check file extension (.xlsx, .xls)
+- Validate required columns
+- Validate data types (date format, etc.)
+- Check for duplicate Interaction IDs
+
+⚠️ Do NOT add photo upload logic here.
+⚠️ Do NOT modify Device model fields.
+Only Excel parsing and device creation.
+
+Output: views.py, serializers.py, utils/excel_parser.py
+```
+
+---
+
+#### **Feature 2.4: Excel Upload UI (Frontend)**
+**Purpose**: UI for Data Host to upload Excel file per technician.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create React component for Data Host to upload Excel files.
+
+Requirements:
+1. Create ExcelUpload component
+   - Dropdown: Select technician (fetch from API)
+   - Dropdown: Select device type (Cleaning / Electrical)
+   - File input: Excel file only (.xlsx, .xls)
+   - Upload button
+2. Show upload progress indicator
+3. After upload success:
+   - Display summary (X devices imported)
+   - Show list of imported devices (preview table)
+4. Warning message: "This will replace all existing devices for this technician"
+5. Error handling and display
+
+Styling: Clean file upload UI with drag-and-drop support (optional)
+
+⚠️ Do NOT create the full Data Host dashboard layout yet.
+⚠️ Do NOT add device editing features.
+Only Excel upload component.
+
+Output: ExcelUpload.jsx, api/host.js (upload function)
+```
+
+---
+
+#### **Feature 2.5: Data Host Dashboard Layout**
+**Purpose**: Complete Data Host dashboard with navigation and feature integration.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create the complete Data Host Dashboard layout.
+
+Requirements:
+1. Dashboard layout component:
+   - Top navigation bar (logo, username, logout button)
+   - Sidebar navigation:
+     * Create Technician
+     * Upload Devices
+   - Main content area (route-based)
+2. Integrate TechnicianForm component (from Feature 2.2)
+3. Integrate ExcelUpload component (from Feature 2.4)
+4. Add dashboard home page showing:
+   - Total technicians created
+   - Total devices uploaded
+   - Recent uploads list
+
+Styling: Modern, responsive Tailwind CSS layout
+
+⚠️ Do NOT add supervisor or technician features here.
+⚠️ Do NOT modify existing components.
+Only create dashboard layout and integrate existing features.
+
+Output: HostDashboard.jsx, HostHome.jsx, components/Sidebar.jsx
+```

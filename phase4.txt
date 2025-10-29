@@ -1,0 +1,453 @@
+**PHASE 4: SUPERVISOR FEATURES**
+
+#### **Feature 4.1: Submission List View (Backend)**
+**Purpose**: API endpoint for supervisor to view all submissions with filters.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/api-endpoints.md and /instructions/database-schema.md.
+
+Create backend endpoint for supervisor to view all submissions.
+
+Requirements:
+1. Endpoint: GET /api/supervisor/submissions
+2. Permission: IsSupervisor only
+3. Filters (query params):
+   - status (Pending / Approved / Rejected / All)
+   - city
+   - technician_id
+   - date_from, date_to
+4. Logic:
+   - Fetch all Submission records with related data:
+     * Technician name and city
+     * Device info (Interaction ID, Type, Region)
+     * Photos count
+5. Output array of submissions with:
+   - Submission ID, status, visit_date, half_month
+   - Technician name, city
+   - Device details
+   - Created_at timestamp
+6. Order by: created_at DESC (newest first)
+
+⚠️ Do NOT add approval logic here.
+⚠️ Do NOT add PDF generation here.
+Only submission list retrieval.
+
+Output: views.py, serializers.py, urls.py
+```
+
+---
+
+#### **Feature 4.2: Submission List View (Frontend)**
+**Purpose**: UI for supervisor to view and filter submissions.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create React component for supervisor submission list.
+
+Requirements:
+1. Create SubmissionList component:
+   - Filter bar:
+     * Status dropdown (All/Pending/Approved/Rejected)
+     * City dropdown
+     * Technician dropdown (dynamic from API)
+     * Date range picker
+   - Submissions table showing:
+     * Submission ID
+     * Technician name
+     * Device Interaction ID
+     * Type (Cleaning/Electrical)
+     * Visit Date
+     * Half Month
+     * Status badge (color-coded)
+     * Action button: "View Details"
+2. Click row → navigate to submission detail page
+3. Show loading and empty states
+
+Styling: Professional table with color-coded status badges
+
+⚠️ Do NOT add approval/reject logic here.
+⚠️ Do NOT create detail page yet.
+Only submission list with filters.
+
+Output: SubmissionList.jsx, api/supervisor.js
+```
+
+---
+
+#### **Feature 4.3: Submission Detail & Approval (Backend)**
+**Purpose**: API endpoint for supervisor to view submission details and approve/reject.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/api-endpoints.md and /instructions/database-schema.md.
+
+Create backend endpoints for supervisor submission detail and approval.
+
+Requirements:
+1. Endpoint: GET /api/supervisor/submissions/{id}
+   - Permission: IsSupervisor only
+   - Output:
+     * Full submission data
+     * All 8 photos grouped by section (section 1: 3 photos, section 2: 3, section 3: 2)
+     * Device full details
+     * Technician info
+     * Static fields (job_description, status, remarks)
+
+2. Endpoint: PATCH /api/supervisor/submissions/{id}/approve
+   - Permission: IsSupervisor only
+   - Logic:
+     * Update submission status = "Approved"
+     * Trigger PDF generation (call pdf_generator function)
+     * Trigger email sending (call email_sender function)
+   - Output: Success message with PDF URL
+
+3. Endpoint: PATCH /api/supervisor/submissions/{id}/reject
+   - Permission: IsSupervisor only
+   - Input: remarks (required)
+   - Logic:
+     * Update submission status = "Rejected"
+     * Save supervisor remarks
+   - Output: Success message
+
+⚠️ Do NOT implement PDF generation yet (placeholder function for now).
+⚠️ Do NOT implement email sending yet (placeholder function for now).
+Only approval/rejection logic and data updates.
+
+Output: views.py, serializers.py, urls.py, utils/pdf_generator.py (stub), utils/email_sender.py (stub)
+```
+
+---
+
+#### **Feature 4.4: Submission Detail & Approval UI (Frontend)**
+**Purpose**: UI for supervisor to view submission details and approve/reject.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create React component for supervisor submission detail and actions.
+
+Requirements:
+1. Create SubmissionDetail component:
+   - Header section:
+     * Submission ID, Status badge
+     * Technician name, City
+     * Device info (ATM #, Type, Region, Interaction ID)
+     * Visit Date, Half Month
+   - Photo gallery grouped by sections:
+     * Section 1: 3 photos with lightbox viewer
+     * Section 2: 3 photos with lightbox viewer
+     * Section 3: 2 photos with lightbox viewer
+   - Static fields display:
+     * Job Description
+     * Status (Ok/Not Ok)
+     * Remarks
+   - Action buttons (only if status = Pending):
+     * Approve button (green)
+     * Reject button (red) → opens remarks modal
+2. Create RejectModal component:
+   - Textarea for supervisor remarks (required)
+   - Confirm/Cancel buttons
+3. Success notification after approve/reject
+4. Disable actions if status is not Pending
+
+Styling: Clean layout with photo grid and clear action buttons
+
+⚠️ Do NOT add PDF download link yet.
+⚠️ Do NOT add email sending UI.
+Only detail view and approve/reject actions.
+
+Output: SubmissionDetail.jsx, RejectModal.jsx, api/supervisor.js
+```
+
+---
+
+#### **Feature 4.5: PDF Generation Logic (Backend)**
+**Purpose**: Generate PDF report matching the provided template.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/security-guidelines.md and the provided PDF template "838 CL1[1].pdf".
+
+Implement PDF generation for approved submissions.
+
+Requirements:
+1. Use reportlab or xhtml2pdf library
+2. PDF template structure (5 pages):
+   - Page 1: Title page
+     * "PPM CLEANING REPORT (Drive Throw)"
+     * ATM # (dynamic from device)
+     * Visit date (dynamic from submission.visit_date)
+   - Page 2: Section 1 instructions + 3 photos
+   - Page 3: Section 2 instructions + 3 photos
+   - Page 4: Section 3 instructions + 2 photos
+   - Page 5: Checklist table
+     * Header: ATM #, Type, Region, GFM ID, Date, City
+     * Checklist items with Ok/Not Ok columns (static layout as in template)
+     * Remarks section (from submission.remarks)
+     * Signature section: Technician name + Project Manager names
+3. Logic:
+   - Fetch submission with related device and photos
+   - Generate PDF matching exact template layout
+   - Save PDF to /media/pdfs/{submission_id}/
+   - Filename: gfm{interaction_id}_{half_month}.pdf
+   - Update Submission.pdf_url with file path
+4. Return PDF file URL
+
+Constraints:
+- Match template fonts, spacing, and layout exactly
+- Embed photos in correct sections
+- Handle missing data gracefully
+
+⚠️ Do NOT send emails in this function.
+⚠️ Do NOT modify Submission model.
+Only PDF generation and file storage.
+
+Output: utils/pdf_generator.py, templates/pdf_template.html (if using xhtml2pdf)
+```
+
+---
+
+#### **Feature 4.6: Email Sending Logic (Backend)**
+**Purpose**: Send generated PDF via email to specified recipients.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/security-guidelines.md.
+
+Implement email sending for approved submissions.
+
+Requirements:
+1. Configure Django EmailBackend (SMTP settings in settings.py using environment variables)
+2. Create email_sender function:
+   - Input: submission_id
+   - Fetch submission with device data
+   - Email details:
+     * To: 269305@alahli.com, sohail.alamoudi@amnwwafaa.com, m.ishtiaq@aroundh-ksa.com, 272923@alahli.com
+     * Subject: "ATM {Type} Report – GFM{interaction_id} – Half {half_month}"
+     * Body (plain text):
+       - ATM ID: {interaction_id}
+       - City: {city}
+       - Technician: {technician_name}
+       - Visit Date: {visit_date}
+       - Status: Approved
+     * Attachment: Generated PDF file
+3. Error handling:
+   - Log email failures
+   - Retry mechanism (optional)
+   - Don't fail approval if email fails
+4. Return success/failure status
+
+Environment variables needed:
+- EMAIL_HOST
+- EMAIL_PORT
+- EMAIL_HOST_USER
+- EMAIL_HOST_PASSWORD
+- EMAIL_USE_TLS
+
+⚠️ Do NOT modify PDF generation logic.
+⚠️ Do NOT add email UI.
+Only email sending function.
+
+Output: utils/email_sender.py, settings.py updates
+```
+
+---
+
+#### **Feature 4.7: Supervisor Dashboard Layout**
+**Purpose**: Complete Supervisor dashboard with navigation.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md.
+
+Create the complete Supervisor Dashboard layout.
+
+Requirements:
+1. Dashboard layout component:
+   - Top navigation bar (logo, username, logout)
+   - Sidebar navigation:
+     * Submissions
+     * Reports (optional)
+   - Main content area with routes:
+     * /supervisor/submissions → SubmissionList
+     * /supervisor/submissions/:id → SubmissionDetail
+2. Add dashboard home page showing statistics:
+   - Total submissions (All time)
+   - Pending submissions count
+   - Approved submissions count
+   - Rejected submissions count
+   - Breakdown by city (chart/table)
+3. Integrate SubmissionList component (from Feature 4.2)
+4. Integrate SubmissionDetail component (from Feature 4.4)
+
+Styling: Professional, dashboard-style layout with stats cards
+
+⚠️ Do NOT add export features yet.
+⚠️ Do NOT modify existing components.
+Only create dashboard layout and routing.
+
+Output: SupervisorDashboard.jsx, SupervisorHome.jsx
+```
+
+---
+📋 FEATURE EXECUTION CHECKLIST
+For each feature, the AI agent must:
+✅ Before coding:
+
+Read /instructions folder thoroughly
+Understand the feature objective and dependencies
+Identify what must NOT be changed
+Plan the implementation approach
+
+✅ During coding:
+
+Follow coding conventions from /instructions/best-practices.md
+Apply security guidelines from /instructions/security-guidelines.md
+Reference API endpoints from /instructions/api-endpoints.md
+Write clean, modular, and commented code
+Use descriptive variable/function names
+
+✅ After coding:
+
+Self-review code for quality and security
+Test the feature independently
+Verify no unintended changes were made
+Document any new patterns or dependencies
+
+
+🎯 FEATURE DEPENDENCY MAP
+Phase 0 (Foundation)
+  └─> Phase 1 (Authentication)
+      ├─> Phase 2 (Data Host Features)
+      │   └─> Must complete before Phase 3
+      │
+      ├─> Phase 3 (Technician Features)
+      │   └─> Depends on Phase 2 (devices must exist)
+      │
+      └─> Phase 4 (Supervisor Features)
+          └─> Depends on Phase 3 (submissions must exist)
+
+Phase 5 (Integration) depends on Phases 1-4 completion
+```
+
+**Critical Dependencies**:
+- Feature 0.1 must be completed FIRST (creates `/instructions` folder)
+- Feature 0.2 must be completed before any backend features
+- Feature 1.1 & 1.2 must be completed before role-specific features
+- Feature 2.3 must be completed before Feature 3.1 (devices must exist)
+- Feature 3.3 must be completed before Feature 4.1 (submissions must exist)
+- Features 4.5 & 4.6 must be completed before Feature 4.3 can fully function
+
+---
+
+## 🔒 SECURITY CHECKLIST (Apply to Every Feature)
+
+Before marking any feature as complete, verify:
+
+✅ **Authentication & Authorization**:
+- [ ] JWT token validated on protected routes
+- [ ] Role-based permissions enforced
+- [ ] No sensitive data exposed in responses
+
+✅ **Input Validation**:
+- [ ] All user inputs validated (type, length, format)
+- [ ] File uploads validated (type, size, content)
+- [ ] SQL injection prevention (use ORM)
+- [ ] XSS prevention (escape outputs)
+
+✅ **Data Protection**:
+- [ ] Passwords hashed (never stored plain text)
+- [ ] Sensitive data not logged
+- [ ] File paths validated (prevent directory traversal)
+- [ ] No hardcoded secrets (use environment variables)
+
+✅ **Error Handling**:
+- [ ] Errors logged without exposing system details
+- [ ] User-friendly error messages shown
+- [ ] No stack traces exposed to frontend
+
+---
+
+## 📊 TESTING STRATEGY (Per Feature)
+
+Each feature must be tested independently:
+
+**Backend Features**:
+1. Unit tests for business logic functions
+2. API endpoint tests (valid/invalid inputs)
+3. Permission tests (unauthorized access attempts)
+4. Database constraint tests
+
+**Frontend Features**:
+1. Component rendering tests
+2. User interaction tests (button clicks, form submissions)
+3. API integration tests (mock responses)
+4. Validation error display tests
+
+**Integration Tests** (Phase 5):
+1. End-to-end user flow tests:
+   - Data Host: Create technician → Upload Excel
+   - Technician: Login → View devices → Submit visit
+   - Supervisor: Login → Review submission → Approve → Verify PDF + Email
+
+---
+
+🎓 VIBE CODING PRINCIPLES REMINDER
+Vision → Always understand the complete feature before coding
+Iteration → Build in small, testable increments
+Best Practices → Follow established patterns and standards
+Execution → Deliver production-ready, secure code
+Golden Rules:
+
+⚠️ "Do NOT change anything I didn't explicitly ask for."
+Always refer to /instructions folder
+One feature = one independent task
+Security validation on every feature
+Test before marking complete
+
+
+✅ FINAL DELIVERABLE CHECKLIST
+Before considering the project complete, verify:
+Documentation:
+
+ /instructions folder complete with all 5 files
+ README.md with setup instructions
+ API documentation (endpoints, request/response formats)
+ Database schema diagram
+
+Functionality:
+
+ All 3 dashboards working independently
+ JWT authentication with role-based access
+ Excel upload and device management
+ Photo upload (8 photos, 3 sections)
+ Submission workflow (Pending → Approved/Rejected)
+ PDF generation matching template
+ Automatic email sending on approval
+
+Security:
+
+ No localStorage/sessionStorage usage
+ All passwords hashed
+ JWT tokens validated on protected routes
+ Input validation on all forms
+ File upload validation
+
+Testing:
+
+ All features tested independently
+ End-to-end workflow tested for each role
+ Error scenarios handled gracefully
+ Email delivery verified
+
+Deployment Readiness:
+
+ Environment variables configured
+ Database migrations applied
+ Static/media files properly served
+ CORS configured for localhost
+ Runs successfully on localhost
