@@ -120,9 +120,12 @@ class PDFGenerator:
             # Track equivalent media-relative directory for storage
             media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
             
-            # Generate PDF filename based on device type
-            device_prefix = 'Electro' if self.is_electrical else 'Cleaning'
-            filename = f"VisitReport_{device_prefix}_{self.submission.device.interaction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            # Generate PDF filename based on device type and cost center
+            if self.is_electrical:
+                filename = f"Electro_{self.submission.device.gfm_cost_center}.pdf"
+            else:
+                # For cleaning devices, use CL1 prefix (can be extended to CL2 logic later if needed)
+                filename = f"CL1_{self.submission.device.gfm_cost_center}.pdf"
             self.pdf_path = os.path.join(pdf_dir, filename)
             self.relative_pdf_path = os.path.join(media_relative_dir, filename)
             
