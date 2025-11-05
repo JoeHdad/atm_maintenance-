@@ -426,6 +426,11 @@ class PDFGenerator:
                 
             x, y = positions[i]
             
+            # Draw white border around the image
+            c.setStrokeColorRGB(1, 1, 1)  # White color
+            c.setLineWidth(2)  # Thin border (2pt)
+            c.rect(x, y, photo_width, photo_height, fill=0, stroke=1)  # Border only, no fill
+            
             try:
                 photo_path = os.path.join('media', photo.file_url)
                 
@@ -444,6 +449,9 @@ class PDFGenerator:
                         # Draw error placeholder
                         c.setFillColorRGB(0.9, 0.9, 0.9)
                         c.rect(x, y, photo_width, photo_height, fill=1)
+                        c.setStrokeColorRGB(1, 1, 1)  # White border
+                        c.setLineWidth(2)
+                        c.rect(x, y, photo_width, photo_height, fill=0, stroke=1)
                         c.setFillColorRGB(0.5, 0.5, 0.5)
                         c.setFont("Helvetica", 12)
                         c.drawCentredString(x + photo_width/2, y + photo_height/2, "Error loading image")
@@ -452,6 +460,9 @@ class PDFGenerator:
                     logger.warning(f"Photo file not found: {photo_path}")
                     c.setFillColorRGB(0.9, 0.9, 0.9)
                     c.rect(x, y, photo_width, photo_height, fill=1)
+                    c.setStrokeColorRGB(1, 1, 1)  # White border
+                    c.setLineWidth(2)
+                    c.rect(x, y, photo_width, photo_height, fill=0, stroke=1)
                     c.setFillColorRGB(0.5, 0.5, 0.5)
                     c.setFont("Helvetica", 12)
                     c.drawCentredString(x + photo_width/2, y + photo_height/2, "Photo not found")
@@ -461,6 +472,9 @@ class PDFGenerator:
                 # Draw error placeholder
                 c.setFillColorRGB(0.9, 0.9, 0.9)
                 c.rect(x, y, photo_width, photo_height, fill=1)
+                c.setStrokeColorRGB(1, 1, 1)  # White border
+                c.setLineWidth(2)
+                c.rect(x, y, photo_width, photo_height, fill=0, stroke=1)
                 c.setFillColorRGB(0.5, 0.5, 0.5)
                 c.setFont("Helvetica", 12)
                 c.drawCentredString(x + photo_width/2, y + photo_height/2, "Error loading photo")
@@ -719,6 +733,11 @@ class PDFGenerator:
         # Draw each photo
         x = 0
         for i, photo in enumerate(photos):
+            # Draw white border around the full-height photo
+            c.setStrokeColorRGB(1, 1, 1)  # White color
+            c.setLineWidth(2)  # Thin border (2pt)
+            c.rect(x, 0, photo_width, available_height, fill=0, stroke=1)  # Border only, no fill
+            
             try:
                 # Get photo path
                 photo_path = os.path.join('media', photo.file_url)
@@ -773,6 +792,9 @@ class PDFGenerator:
                         # Draw error placeholder
                         c.setFillColorRGB(0.9, 0.9, 0.9)
                         c.rect(x, 0, photo_width, available_height, fill=1)
+                        c.setStrokeColorRGB(1, 1, 1)  # White border
+                        c.setLineWidth(2)
+                        c.rect(x, 0, photo_width, available_height, fill=0, stroke=1)
                         c.setFillColorRGB(0.5, 0.5, 0.5)
                         c.setFont("Helvetica", 12)
                         c.drawCentredString(x + photo_width/2, available_height/2, "Error loading image")
@@ -781,6 +803,9 @@ class PDFGenerator:
                     logger.warning(f"Photo file not found: {photo_path}")
                     c.setFillColorRGB(0.9, 0.9, 0.9)
                     c.rect(x, 0, photo_width, available_height, fill=1)
+                    c.setStrokeColorRGB(1, 1, 1)  # White border
+                    c.setLineWidth(2)
+                    c.rect(x, 0, photo_width, available_height, fill=0, stroke=1)
                     c.setFillColorRGB(0.5, 0.5, 0.5)
                     c.setFont("Helvetica", 12)
                     c.drawCentredString(x + photo_width/2, available_height/2, "Photo not found")
@@ -792,6 +817,9 @@ class PDFGenerator:
                 # Draw error placeholder and continue
                 c.setFillColorRGB(0.9, 0.9, 0.9)
                 c.rect(x, 0, photo_width, available_height, fill=1)
+                c.setStrokeColorRGB(1, 1, 1)  # White border
+                c.setLineWidth(2)
+                c.rect(x, 0, photo_width, available_height, fill=0, stroke=1)
                 c.setFillColorRGB(0.5, 0.5, 0.5)
                 c.setFont("Helvetica", 12)
                 c.drawCentredString(x + photo_width/2, available_height/2, "Error loading photo")
