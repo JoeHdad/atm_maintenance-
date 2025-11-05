@@ -1,5 +1,9 @@
 import os
+import sys
 import django
+
+# Add backend directory to Python path
+sys.path.insert(0, os.path.dirname(__file__))
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'atm_backend.settings')
 django.setup()
@@ -20,7 +24,20 @@ print(f"  Port: {settings.EMAIL_PORT}")
 print(f"  Use TLS: {settings.EMAIL_USE_TLS}")
 print(f"  From Email: {settings.DEFAULT_FROM_EMAIL}")
 print(f"  Host User: {settings.EMAIL_HOST_USER or '(Not configured)'}")
-print(f"  Recipients: {', '.join(settings.APPROVAL_EMAIL_RECIPIENTS)}")
+
+# Debug: print available settings
+print("\nDEBUG: Available settings attributes:")
+for attr in dir(settings):
+    if not attr.startswith('_'):
+        print(f"  {attr}")
+
+print(f"\nDEBUG: APPROVAL_EMAIL_RECIPIENTS in settings: {hasattr(settings, 'APPROVAL_EMAIL_RECIPIENTS')}")
+if hasattr(settings, 'APPROVAL_EMAIL_RECIPIENTS'):
+    print(f"  Value: {settings.APPROVAL_EMAIL_RECIPIENTS}")
+    print(f"  Recipients: {', '.join(settings.APPROVAL_EMAIL_RECIPIENTS)}")
+else:
+    print("  Not found!")
+    print("  Recipients: N/A")
 
 # Get a test submission with PDF
 submissions = Submission.objects.filter(pdf_url__isnull=False)
@@ -55,7 +72,7 @@ print(f"  Status: {submission.status}")
 print(f"  PDF URL: {submission.pdf_url}")
 
 # Check if PDF file exists
-pdf_full_path = submission.pdf_url if os.path.isabs(submission.pdf_url) else os.path.join(os.getcwd(), submission.pdf_url)
+pdf_full_path = submission.pdf_url if os.path.isabs(submission.pdf_url) else os.path.join(settings.PDF_BASE_DIR, submission.pdf_url.lstrip('media/pdfs/'))
 pdf_exists = os.path.exists(pdf_full_path)
 print(f"  PDF Exists: {pdf_exists}")
 
@@ -96,7 +113,8 @@ else:
     print("\n🔄 Sending email...")
     print("   This will actually send an email to the configured recipients.")
     
-    confirm = input("\n   Do you want to proceed? (yes/no): ")
+    # Auto-confirm for testing
+    confirm = 'yes'
     
     if confirm.lower() == 'yes':
         try:

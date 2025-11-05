@@ -87,7 +87,7 @@ else:
     print(f"\n✅ PDF already exists: {submission.pdf_url}")
 
 # Check if PDF file exists
-pdf_full_path = submission.pdf_url if os.path.isabs(submission.pdf_url) else os.path.join(os.getcwd(), submission.pdf_url)
+pdf_full_path = submission.pdf_url if os.path.isabs(submission.pdf_url) else os.path.join(settings.PDF_BASE_DIR, submission.pdf_url.lstrip('media/pdfs/'))
 if not os.path.exists(pdf_full_path):
     print(f"\n❌ PDF file not found at: {pdf_full_path}")
     exit(1)

@@ -131,6 +131,10 @@ def upload_excel(request):
     technician_id = serializer.validated_data['technician_id']
     device_type = serializer.validated_data.get('device_type')
     
+    # Log for debugging
+    print(f"[UPLOAD DEBUG] Received device_type: {device_type}")
+    print(f"[UPLOAD DEBUG] Technician ID: {technician_id}")
+    
     # Technician is now REQUIRED
     if not technician_id:
         return Response(
@@ -177,21 +181,70 @@ def upload_excel(request):
         
         # Use transaction to ensure atomicity
         with transaction.atomic():
-            # Create ExcelUpload record
-            excel_upload = ExcelUpload.objects.create(
+            # Check if an upload already exists for this technician and device type
+            existing_upload = ExcelUpload.objects.filter(
                 technician=technician,
-                uploaded_by=request.user,
-                file_name=excel_file.name,
-                file_path=relative_path,
-                device_type=device_type,
-                parsed_data=parsed_data,
-                row_count=row_count
-            )
+                device_type=device_type
+            ).first()
             
+            if existing_upload:
+                # Update existing upload
+                print(f"[UPLOAD DEBUG] Updating existing upload for device_type: {device_type}")
+                print(f"[UPLOAD DEBUG] Existing upload ID: {existing_upload.id}")
+                existing_upload.uploaded_by = request.user
+                existing_upload.file_name = excel_file.name
+                existing_upload.file_path = relative_path
+                existing_upload.parsed_data = parsed_data
+                existing_upload.row_count = row_count
+                existing_upload.upload_date = datetime.now()
+                existing_upload.save()
+                excel_upload = existing_upload
+                print(f"[UPLOAD DEBUG] Updated upload ID: {excel_upload.id}, device_type: {excel_upload.device_type}")
+            else:
+                # Create new ExcelUpload record
+                print(f"[UPLOAD DEBUG] Creating new upload for device_type: {device_type}")
+                excel_upload = ExcelUpload.objects.create(
+                    technician=technician,
+                    uploaded_by=request.user,
+                    file_name=excel_file.name,
+                    file_path=relative_path,
+                    device_type=device_type,
+                    parsed_data=parsed_data,
+                    row_count=row_count
+                )
+                print(f"[UPLOAD DEBUG] Created upload with ID: {excel_upload.id}, device_type: {excel_upload.device_type}")
+            
+            # Verify what's actually in the database
+            all_uploads_for_tech = ExcelUpload.objects.filter(technician=technician)
+            print(f"[UPLOAD DEBUG] Total uploads for technician {technician.id} after save: {all_uploads_for_tech.count()}")
+            for upload in all_uploads_for_tech:
+                print(f"[UPLOAD DEBUG]   - ID: {upload.id}, device_type: '{upload.device_type}', file: {upload.file_name}")
+
             # Create Device records from Excel data
-            from .models import TechnicianDevice
+            from .models import TechnicianDevice, Device
+
+            # If replacing data, remove previous assignments for this technician & device type
+            existing_assignments = TechnicianDevice.objects.filter(
+                technician=technician,
+                device__type=device_type
+            )
+
+            if existing_assignments.exists():
+                assignment_count = existing_assignments.count()
+                device_ids = list(existing_assignments.values_list('device_id', flat=True))
+                print(f"[UPLOAD DEBUG] Removing {assignment_count} existing assignments for device_type '{device_type}'")
+                existing_assignments.delete()
+
+                # Clean up orphan devices (no remaining technician assignments)
+                removed_devices = 0
+                for device_id in device_ids:
+                    if not TechnicianDevice.objects.filter(device_id=device_id).exists():
+                        Device.objects.filter(id=device_id).delete()
+                        removed_devices += 1
+                print(f"[UPLOAD DEBUG] Removed {removed_devices} orphan device records for device_type '{device_type}'")
+
             devices_created = 0
-            
+
             for index, row in enumerate(parsed_data):
                 # Skip header row
                 if index == 0:
@@ -222,7 +275,7 @@ def upload_excel(request):
                         'gfm_problem_type': gfm_problem_type or '',
                         'gfm_problem_date': gfm_problem_date or '',
                         'city': city or '',
-                        'type': device_type or 'Cleaning',
+                        'type': device_type or 'Cleaning1',
                     }
                 )
                 
@@ -234,6 +287,13 @@ def upload_excel(request):
                 
                 if created:
                     devices_created += 1
+        
+        # Log final state before response
+        print(f"[UPLOAD DEBUG] ========================================")
+        print(f"[UPLOAD DEBUG] Upload complete for technician {technician.id}")
+        print(f"[UPLOAD DEBUG] Uploaded device_type: {device_type}")
+        print(f"[UPLOAD DEBUG] Upload ID: {excel_upload.id}")
+        print(f"[UPLOAD DEBUG] ========================================")
         
         # Prepare response
         response_data = {
@@ -343,8 +403,11 @@ def get_my_excel_data(request):
         device_remarks_map = {}
         for tech_device in technician_devices:
             device = tech_device.device
-            # Get the latest submission for this device
-            latest_submission = device.submissions.order_by('-created_at').first()
+            # Get the latest submission for THIS technician for this device (FIXED: added technician filter)
+            latest_submission = Submission.objects.filter(
+                technician=request.user,
+                device=device
+            ).order_by('-created_at').first()
             if latest_submission:
                 # Return actual status: Active, Pending, Approved, Rejected
                 device_status_map[device.interaction_id] = latest_submission.status
@@ -453,7 +516,7 @@ def technician_devices_view(request):
         # Apply type filter
         device_type = request.query_params.get('type', 'All')
         if device_type and device_type != 'All':
-            if device_type in ['Cleaning', 'Electrical']:
+            if device_type in ['Cleaning1', 'Cleaning2', 'Electrical', 'Security', 'Stand Alone']:
                 devices = devices.filter(type=device_type)
         
         # Apply status (region) filter
@@ -539,17 +602,33 @@ def submit_maintenance(request):
         
         # Use transaction to ensure atomicity
         with transaction.atomic():
-            # Create submission with status='Pending' (approval status)
-            submission = Submission.objects.create(
-                technician=validated_data['technician'],
-                device=validated_data['device'],
-                type=validated_data['type'],
-                visit_date=validated_data['visit_date'],
-                half_month=validated_data['half_month'],
-                job_status=validated_data['job_status'],  # Ok/Not Ok
-                status='Pending',  # Always Pending until supervisor reviews
-                remarks=validated_data.get('remarks', '')
-            )
+            # Check if resubmitting a rejected submission
+            existing_submission = validated_data.get('existing_submission')
+            
+            if existing_submission:
+                # Reuse the rejected submission by updating its fields
+                submission = existing_submission
+                submission.job_status = validated_data['job_status']
+                submission.status = 'Pending'  # Reset to Pending for re-review
+                submission.remarks = validated_data.get('remarks', '')
+                submission.save()
+                
+                # Delete old photos from disk and database
+                from .utils.file_handler import delete_submission_photos, FileHandlerError
+                delete_submission_photos(submission.id)
+                Photo.objects.filter(submission=submission).delete()
+            else:
+                # Create new submission with status='Pending' (approval status)
+                submission = Submission.objects.create(
+                    technician=validated_data['technician'],
+                    device=validated_data['device'],
+                    type=validated_data['type'],
+                    visit_date=validated_data['visit_date'],
+                    half_month=validated_data['half_month'],
+                    job_status=validated_data['job_status'],  # Ok/Not Ok
+                    status='Pending',  # Always Pending until supervisor reviews
+                    remarks=validated_data.get('remarks', '')
+                )
             
             # Save photos using file handler
             from .utils.file_handler import save_submission_photos, FileHandlerError
@@ -588,5 +667,158 @@ def submit_maintenance(request):
     except Exception as e:
         return Response(
             {'error': f'Failed to create submission: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsDataHost])
+def get_uploaded_types(request, technician_id):
+    """
+    Get list of device types that have been uploaded for a specific technician.
+    
+    GET /api/host/technicians/<technician_id>/uploaded-types
+    
+    Response:
+        - uploaded_types: List of device type strings
+    """
+    try:
+        # Log for debugging
+        print(f"[GET_TYPES DEBUG] Fetching uploaded types for technician_id: {technician_id}")
+        
+        # Get all Excel uploads for this technician
+        uploads = ExcelUpload.objects.filter(
+            technician_id=technician_id
+        ).values_list('device_type', flat=True).distinct()
+        
+        # Filter out null/empty values and return list
+        uploaded_types = [device_type for device_type in uploads if device_type]
+        
+        print(f"[GET_TYPES DEBUG] Found uploaded types: {uploaded_types}")
+        
+        # Debug: Show all uploads for this technician
+        all_uploads = ExcelUpload.objects.filter(technician_id=technician_id)
+        print(f"[GET_TYPES DEBUG] Total uploads: {all_uploads.count()}")
+        for upload in all_uploads:
+            print(f"[GET_TYPES DEBUG] - Upload ID: {upload.id}, device_type: {upload.device_type}, file: {upload.file_name}")
+        
+        return Response({
+            'uploaded_types': uploaded_types
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch uploaded types: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsDataHost])
+def get_uploaded_files(request, technician_id):
+    """
+    Get detailed information about all uploaded files for a specific technician.
+    
+    GET /api/host/technicians/<technician_id>/uploaded-files
+    
+    Response:
+        - files: List of file objects with details
+    """
+    try:
+        print(f"[GET_FILES DEBUG] Fetching uploaded files for technician_id: {technician_id}")
+        
+        # Get all Excel uploads for this technician
+        uploads = ExcelUpload.objects.filter(
+            technician_id=technician_id
+        ).order_by('-upload_date')
+        
+        files = []
+        for upload in uploads:
+            files.append({
+                'id': upload.id,
+                'device_type': upload.device_type,
+                'file_name': upload.file_name,
+                'upload_date': upload.upload_date,
+                'row_count': upload.row_count,
+                'uploaded_by': upload.uploaded_by.username if upload.uploaded_by else 'Unknown',
+            })
+        
+        print(f"[GET_FILES DEBUG] Found {len(files)} files")
+        
+        return Response({
+            'files': files
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch uploaded files: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsTechnician])
+def get_excel_data_by_type(request, device_type):
+    """
+    Get Excel data for the logged-in technician filtered by device type.
+    
+    GET /api/technician/excel-data/<device_type>
+    
+    Response:
+        - data: List of Excel data rows for the specified device type
+        - device_type: The requested device type
+        - file_name: Name of the Excel file
+        - upload_date: When the file was uploaded
+    """
+    try:
+        # Log for debugging
+        print(f"[RETRIEVAL DEBUG] ========================================")
+        print(f"[RETRIEVAL DEBUG] Fetching data for device_type: '{device_type}'")
+        print(f"[RETRIEVAL DEBUG] Device type length: {len(device_type)}")
+        print(f"[RETRIEVAL DEBUG] Device type repr: {repr(device_type)}")
+        print(f"[RETRIEVAL DEBUG] Technician: {request.user.username} (ID: {request.user.id})")
+        
+        # Debug: Show all uploads for this technician
+        all_uploads = ExcelUpload.objects.filter(technician=request.user)
+        print(f"[RETRIEVAL DEBUG] Total uploads for technician: {all_uploads.count()}")
+        for upload in all_uploads:
+            print(f"[RETRIEVAL DEBUG] - Upload ID: {upload.id}")
+            print(f"[RETRIEVAL DEBUG]   device_type: '{upload.device_type}' (repr: {repr(upload.device_type)})")
+            print(f"[RETRIEVAL DEBUG]   file: {upload.file_name}")
+            print(f"[RETRIEVAL DEBUG]   match: {upload.device_type == device_type}")
+        
+        # Get Excel uploads for this technician and device type
+        uploads = ExcelUpload.objects.filter(
+            technician=request.user,
+            device_type=device_type
+        ).order_by('-upload_date')
+        
+        print(f"[RETRIEVAL DEBUG] Matching uploads for '{device_type}': {uploads.count()}")
+        
+        if not uploads.exists():
+            return Response({
+                'data': [],
+                'device_type': device_type,
+                'message': f'No Excel data found for device type: {device_type}'
+            }, status=status.HTTP_200_OK)
+        
+        # Get the most recent upload for this device type
+        latest_upload = uploads.first()
+        print(f"[RETRIEVAL DEBUG] Returning upload ID: {latest_upload.id}")
+        print(f"[RETRIEVAL DEBUG] Returning device_type: '{latest_upload.device_type}'")
+        print(f"[RETRIEVAL DEBUG] Returning file: {latest_upload.file_name}")
+        print(f"[RETRIEVAL DEBUG] Returning rows: {len(latest_upload.parsed_data)}")
+        print(f"[RETRIEVAL DEBUG] ========================================")
+        
+        return Response({
+            'data': latest_upload.parsed_data,
+            'device_type': device_type,
+            'file_name': latest_upload.file_name,
+            'upload_date': latest_upload.upload_date
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch Excel data: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

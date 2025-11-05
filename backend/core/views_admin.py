@@ -4,8 +4,9 @@ Admin/Supervisor views for reviewing and approving submissions
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count
 import logging
+import threading
 
 from .models import Submission, Photo
 from .serializers import SubmissionSerializer
@@ -148,32 +149,37 @@ def approve_submission(request, submission_id):
         
         submission.save()
         
-        # Generate PDF (Feature 4.5)
-        try:
-            pdf_path = generate_pdf(submission)
-            submission.pdf_url = pdf_path
-            submission.save()
-            pdf_status = f"PDF generated successfully: {pdf_path}"
-            logger.info(f"PDF generated for submission {submission_id}: {pdf_path}")
-        except Exception as e:
-            pdf_status = f"PDF generation failed: {str(e)}"
-            logger.error(f"PDF generation failed for submission {submission_id}: {str(e)}")
+        # Start background thread for PDF generation and email sending
+        def process_approval_async():
+            """Background task to generate PDF and send email"""
+            try:
+                # Generate PDF
+                pdf_path = generate_pdf(submission)
+                submission.pdf_url = pdf_path
+                submission.save()
+                logger.info(f"PDF generated for submission {submission_id}: {pdf_path}")
+                
+                # Send email notification
+                email_result = send_approval_email(submission)
+                email_status = email_result.get('message')
+                email_success = email_result.get('success')
+                logger.info(f"Email sent for submission {submission_id}: {email_status} (Success: {email_success})")
+            except Exception as e:
+                logger.error(f"Background processing failed for submission {submission_id}: {str(e)}")
         
-        # Send email notification (Feature 4.6)
-        email_result = send_approval_email(submission)
-        email_status = email_result.get('message')
-        email_success = email_result.get('success')
-        logger.info(f"Email sending result for submission {submission_id}: {email_status} (Success: {email_success})")
+        # Launch async task
+        thread = threading.Thread(target=process_approval_async, daemon=True)
+        thread.start()
         
-        # Serialize response
+        # Serialize response and return immediately
         serializer = SubmissionSerializer(submission)
         
         return Response({
             'status': 'success',
-            'message': 'Submission approved successfully',
+            'message': 'Submission approved successfully. PDF generation and email notification are being processed in the background.',
             'submission': serializer.data,
-            'pdf_status': pdf_status,
-            'email_status': email_status
+            'pdf_status': 'Processing in background',
+            'email_status': 'Processing in background'
         }, status=status.HTTP_200_OK)
         
     except Submission.DoesNotExist:
@@ -266,7 +272,8 @@ def preview_pdf(request, submission_id):
         - message: Success message
     """
     try:
-        submission = Submission.objects.get(id=submission_id)
+        # Prefetch photos to avoid N+1 queries during PDF generation
+        submission = Submission.objects.select_related('device', 'technician').prefetch_related('photos').get(id=submission_id)
         
         # Generate PDF preview
         try:

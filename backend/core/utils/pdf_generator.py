@@ -14,6 +14,8 @@ from PIL import Image
 import logging
 import signal
 from contextlib import contextmanager
+from django.conf import settings
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -44,39 +46,132 @@ class PDFGenerator:
         # Use landscape orientation: 297mm x 210mm
         self.width, self.height = landscape(A4)
         self.pdf_path = None
+        # Cache for image dimensions to avoid repeated PIL operations
+        self._image_cache = {}
         
+    def _preprocess_image(self, photo_path):
+        """Preprocess a single image for faster rendering"""
+        try:
+            if not os.path.exists(photo_path):
+                return None
+            
+            with Image.open(photo_path) as img:
+                img_width, img_height = img.size
+                
+                # Resize large images for faster PDF rendering
+                max_dimension = 2000
+                if img_width > max_dimension or img_height > max_dimension:
+                    ratio = min(max_dimension / img_width, max_dimension / img_height)
+                    new_width = int(img_width * ratio)
+                    new_height = int(img_height * ratio)
+                    
+                    resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    temp_path = photo_path + '.temp.jpg'
+                    resized_img.save(temp_path, 'JPEG', quality=85, optimize=True)
+                    
+                    return (new_width, new_height, temp_path)
+                else:
+                    return (img_width, img_height, photo_path)
+        except Exception as e:
+            logger.error(f"Error preprocessing image {photo_path}: {str(e)}")
+            return None
+    
+    def _preload_all_images(self):
+        """Preload and resize all images in parallel for faster rendering"""
+        photos = self.submission.photos.all()
+        photo_paths = [os.path.join('media', photo.file_url) for photo in photos]
+        
+        # Process images in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_path = {executor.submit(self._preprocess_image, path): path for path in photo_paths}
+            
+            for future in as_completed(future_to_path):
+                path = future_to_path[future]
+                try:
+                    result = future.result()
+                    if result:
+                        self._image_cache[path] = result
+                except Exception as e:
+                    logger.error(f"Failed to preprocess {path}: {str(e)}")
+    
     def generate(self):
         """
         Generate the complete 5-page PDF report
         Returns: Path to generated PDF file
         """
+        import time
+        start_time = time.time()
+        
         try:
+            # Preload all images in parallel before generating PDF
+            preload_start = time.time()
+            self._preload_all_images()
+            logger.info(f"Images preloaded in {time.time() - preload_start:.2f}s")
+            
             # Create PDF directory if it doesn't exist
-            pdf_dir = os.path.join('media', 'pdfs', str(self.submission.id))
+            pdf_dir = os.path.join(settings.PDF_BASE_DIR, str(self.submission.id))
             os.makedirs(pdf_dir, exist_ok=True)
+
+            # Track equivalent media-relative directory for storage
+            media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
             
             # Generate PDF filename
             filename = f"report_{self.submission.device.interaction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             self.pdf_path = os.path.join(pdf_dir, filename)
+            self.relative_pdf_path = os.path.join(media_relative_dir, filename)
             
             # Create PDF canvas with landscape orientation
             c = canvas.Canvas(self.pdf_path, pagesize=landscape(A4))
             
-            # Generate each page
+            # Generate each page with timing
+            page_start = time.time()
             self._generate_page1(c)  # Cover page
+            logger.info(f"Page 1 generated in {time.time() - page_start:.2f}s")
+            
+            page_start = time.time()
             self._generate_page2(c)  # Section 1 photos
+            logger.info(f"Page 2 generated in {time.time() - page_start:.2f}s")
+            
+            page_start = time.time()
             self._generate_page3(c)  # Section 2 photos
+            logger.info(f"Page 3 generated in {time.time() - page_start:.2f}s")
+            
+            page_start = time.time()
             self._generate_page4(c)  # Section 3 photos
+            logger.info(f"Page 4 generated in {time.time() - page_start:.2f}s")
+            
+            page_start = time.time()
             self._generate_page5(c)  # Checklist table
+            logger.info(f"Page 5 generated in {time.time() - page_start:.2f}s")
             
             # Save PDF
             c.save()
             
-            logger.info(f"PDF generated successfully: {self.pdf_path}")
-            return self.pdf_path.replace('\\', '/')
+            # Cleanup temporary resized images
+            for cached_data in self._image_cache.values():
+                if len(cached_data) == 3:  # (width, height, path)
+                    temp_path = cached_data[2]
+                    if temp_path.endswith('.temp.jpg') and os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except Exception as cleanup_error:
+                            logger.warning(f"Failed to cleanup temp file {temp_path}: {str(cleanup_error)}")
+            
+            total_time = time.time() - start_time
+            logger.info(f"PDF generated successfully in {total_time:.2f}s: {self.pdf_path}")
+            return self.relative_pdf_path.replace('\\', '/')
             
         except Exception as e:
             logger.error(f"PDF generation failed: {str(e)}")
+            # Cleanup temp files even on error
+            for cached_data in self._image_cache.values():
+                if len(cached_data) == 3:
+                    temp_path = cached_data[2]
+                    if temp_path.endswith('.temp.jpg') and os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except:
+                            pass
             raise Exception(f"PDF generation failed: {str(e)}")
     
     def _generate_page1(self, c):
@@ -86,7 +181,8 @@ class PDFGenerator:
         """
         # Draw gradient background (dark black to dark teal)
         # Left side: darker (black), Right side: teal
-        num_strips = 50
+        # Reduced strips for faster rendering (20 instead of 50)
+        num_strips = 20
         for i in range(num_strips):
             # Gradient from black (0,0,0) on left to dark teal (0.1, 0.35, 0.35) on right
             ratio = i / num_strips
@@ -561,12 +657,17 @@ class PDFGenerator:
                 photo_path = os.path.join('media', photo.file_url)
                 
                 if os.path.exists(photo_path):
-                    # Open image with PIL to check quality (with timeout protection)
+                    # Use preloaded image from cache
                     try:
-                        img = Image.open(photo_path)
+                        if photo_path in self._image_cache:
+                            img_width, img_height, render_path = self._image_cache[photo_path]
+                        else:
+                            # Fallback: load image if not in cache (shouldn't happen with preloading)
+                            with Image.open(photo_path) as img:
+                                img_width, img_height = img.size
+                                render_path = photo_path
                         
                         # Calculate aspect ratio to maintain quality
-                        img_width, img_height = img.size
                         aspect_ratio = img_width / img_height
                         
                         # Fit image within allocated space while maintaining aspect ratio
@@ -583,13 +684,10 @@ class PDFGenerator:
                         x_offset = (photo_width - draw_width) / 2
                         y_offset = (photo_height - draw_height) / 2
                         
-                        # Draw photo with high quality (centered in allocated space)
-                        c.drawImage(photo_path, x + x_offset, y_position - draw_height - y_offset, 
+                        # Draw photo with optimized image (centered in allocated space)
+                        c.drawImage(ImageReader(render_path), x + x_offset, y_position - draw_height - y_offset, 
                                   width=draw_width, height=draw_height, 
                                   preserveAspectRatio=True, mask='auto')
-                        
-                        # Close image to free memory
-                        img.close()
                     except Exception as img_error:
                         logger.error(f"Error processing image {photo.id}: {str(img_error)}")
                         # Draw error placeholder

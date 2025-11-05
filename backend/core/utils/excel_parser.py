@@ -7,7 +7,8 @@ Excel file and can be read successfully.
 """
 
 import openpyxl
-from typing import List, Dict, Tuple
+from datetime import date, datetime, time
+from typing import Dict, List, Tuple
 
 
 class ExcelParserError(Exception):
@@ -92,7 +93,7 @@ class GenericExcelParser:
             
             # Convert row to dictionary with column indices as keys
             row_dict = {
-                f"col_{i}": cell_value 
+                f"col_{i}": self._normalize_cell_value(cell_value)
                 for i, cell_value in enumerate(row, start=1)
             }
             
@@ -103,6 +104,16 @@ class GenericExcelParser:
             raise ExcelParserError("Excel file contains no data rows")
         
         return all_data
+
+    def _normalize_cell_value(self, value):
+        """Convert non-JSON-serializable values to string representations."""
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, time):
+            return value.isoformat()
+        return value
     
     def parse(self) -> List[Dict]:
         """

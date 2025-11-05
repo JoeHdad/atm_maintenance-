@@ -87,14 +87,21 @@ ATM Maintenance System
         
         # Attach PDF if available
         if submission.pdf_url:
-            # PDF URL is relative to project root (e.g., "media/pdfs/1/report.pdf")
-            pdf_path = submission.pdf_url if os.path.isabs(submission.pdf_url) else os.path.join(os.getcwd(), submission.pdf_url)
-            
+            # Resolve the actual filesystem path for the stored PDF.
+            # Handles values such as "media/pdfs/<id>/report.pdf" by
+            # joining them with PDF_BASE_DIR, ensuring we pick the dynamic
+            # folder generated per submission.
+            pdf_url = submission.pdf_url
+            if os.path.isabs(pdf_url):
+                pdf_path = pdf_url
+            else:
+                pdf_path = os.path.join(settings.PDF_BASE_DIR, pdf_url.lstrip('media/pdfs/'))
+
             if os.path.exists(pdf_path):
                 with open(pdf_path, 'rb') as pdf_file:
                     pdf_filename = f"ATM_Report_{device.interaction_id}_{submission.created_at.strftime('%Y%m%d')}.pdf"
                     email.attach(pdf_filename, pdf_file.read(), 'application/pdf')
-                    logger.info(f"PDF attached: {pdf_filename}")
+                    logger.info(f"PDF attached: {pdf_filename} at {pdf_path}")
             else:
                 logger.warning(f"PDF file not found: {pdf_path}")
                 return {

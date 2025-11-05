@@ -130,7 +130,7 @@ STATIC_URL = 'static/'
 
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = r'C:\Users\ahmed\OneDrive\Desktop\VIBE CODING\Windsurf\atm-maintenance-system\backend\media'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000', cast=lambda v: [s.strip() for s in v.split(',')])
@@ -181,12 +181,19 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@atm-maintenance.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='yossefhaddad20@gmail.com')
 
 # Email Recipients for Approval Notifications
 APPROVAL_EMAIL_RECIPIENTS = [
+    '269305@alahli.com',
+    'sohail.alamoudi@amnwwafaa.com',
+    'm.ishtiaq@aroundh-ksa.com',
+    '272923@alahli.com',
     'yossefhaddad20@gmail.com',
 ]
+
+# PDF storage directory
+PDF_BASE_DIR = r'C:\Users\ahmed\OneDrive\Desktop\VIBE CODING\Windsurf\atm-maintenance-system\backend\media\pdfs'
 
 # Logging Configuration
 LOGGING = {

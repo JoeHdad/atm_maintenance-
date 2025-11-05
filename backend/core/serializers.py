@@ -29,19 +29,19 @@ class LoginSerializer(serializers.Serializer):
             user = authenticate(username=username, password=password)
             if not user:
                 raise serializers.ValidationError(
-                    'Invalid credentials',
+                    'Invalid username or password',
                     code='invalid_credentials'
                 )
             if not user.is_active:
                 raise serializers.ValidationError(
-                    'Account is disabled',
+                    'Your account has been disabled. Please contact support.',
                     code='account_disabled'
                 )
             attrs['user'] = user
             return attrs
         else:
             raise serializers.ValidationError(
-                'Must include username and password',
+                'Please provide both username and password',
                 code='missing_credentials'
             )
 
@@ -147,9 +147,9 @@ class ExcelUploadSerializer(serializers.Serializer):
         help_text="ID of the technician to assign devices to"
     )
     device_type = serializers.ChoiceField(
-        choices=['Cleaning', 'Electrical'],
+        choices=[choice[0] for choice in Device.MAINTENANCE_TYPE_CHOICES],
         required=True,
-        help_text="Type of maintenance (Cleaning or Electrical)"
+        help_text="Type of maintenance (Cleaning1, Cleaning2, Electrical, Security, or Stand Alone)"
     )
     
     def validate_technician_id(self, value):
@@ -252,8 +252,8 @@ class DeviceListSerializer(serializers.ModelSerializer):
     def get_next_due_date(self, obj):
         """
         Calculate next due date based on maintenance type.
-        - Cleaning: Next half_month (1 or 2) within current month or next month
-        - Electrical: Next month if already submitted this month
+        - Cleaning1, Cleaning2: Next half_month (1 or 2) within current month or next month
+        - Electrical, Security: Next month if already submitted this month
         """
         today = date.today()
         current_half_month = 1 if today.day <= 15 else 2
@@ -263,7 +263,8 @@ class DeviceListSerializer(serializers.ModelSerializer):
         if not request or not request.user:
             return None
         
-        if obj.type == 'Cleaning':
+        # Cleaning types use half-month scheduling
+        if obj.type in ['Cleaning1', 'Cleaning2']:
             # Check if submitted for current half_month
             submitted_current = Submission.objects.filter(
                 device=obj,
@@ -298,7 +299,8 @@ class DeviceListSerializer(serializers.ModelSerializer):
                         'description': f'Half 1 of {next_month.strftime("%B %Y")}'
                     }
         
-        elif obj.type == 'Electrical':
+        # Electrical and Security types use monthly scheduling
+        elif obj.type in ['Electrical', 'Security']:
             # Check if submitted this month
             submitted_this_month = Submission.objects.filter(
                 device=obj,
@@ -429,18 +431,27 @@ class SubmissionCreateSerializer(serializers.Serializer):
         attrs['half_month'] = half_month
 
         # Check for duplicate submission (same device + same half_month)
-        duplicate_exists = Submission.objects.filter(
+        existing_submissions = Submission.objects.filter(
             device=device,
             technician=technician,
             visit_date__year=visit_date.year,
             visit_date__month=visit_date.month,
             half_month=half_month
-        ).exists()
+        )
 
-        if duplicate_exists:
+        non_rejected_submission = existing_submissions.exclude(status='Rejected').first()
+        if non_rejected_submission:
             raise serializers.ValidationError(
                 f"You have already submitted for this device in half {half_month} of {visit_date.strftime('%B %Y')}"
             )
+
+        rejected_submission = existing_submissions.filter(status='Rejected').order_by('-created_at').first()
+        if rejected_submission:
+            if rejected_submission.visit_date != visit_date:
+                raise serializers.ValidationError(
+                    "Your previous submission for this device was rejected. Please resubmit using the same visit date."
+                )
+            attrs['existing_submission'] = rejected_submission
 
         attrs['device'] = device
         attrs['technician'] = technician

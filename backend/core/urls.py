@@ -13,11 +13,14 @@ urlpatterns = [
     
     # Data Host endpoints
     path('host/technicians/', views.technicians_view, name='technicians'),
+    path('host/technicians/<int:technician_id>/uploaded-types', views.get_uploaded_types, name='get_uploaded_types'),
+    path('host/technicians/<int:technician_id>/uploaded-files', views.get_uploaded_files, name='get_uploaded_files'),
     path('host/upload-excel', views.upload_excel, name='upload_excel'),
     path('host/dashboard-stats', views.dashboard_stats, name='dashboard_stats'),
     
     # Technician endpoints
     path('technician/my-excel-data', views.get_my_excel_data, name='my_excel_data'),
+    path('technician/excel-data/<str:device_type>', views.get_excel_data_by_type, name='excel_data_by_type'),
     path('technician/devices', views.technician_devices_view, name='technician_devices'),
     path('technician/submit', views.submit_maintenance, name='submit_maintenance'),
     

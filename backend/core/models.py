@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -42,8 +43,11 @@ class Device(models.Model):
     ATM device information imported from Excel files.
     """
     MAINTENANCE_TYPE_CHOICES = [
-        ('Cleaning', 'Cleaning'),
+        ('Cleaning1', 'Cleaning1'),
+        ('Cleaning2', 'Cleaning2'),
         ('Electrical', 'Electrical'),
+        ('Security', 'Security'),
+        ('Stand Alone', 'Stand Alone'),
     ]
 
     interaction_id = models.CharField(
@@ -181,11 +185,18 @@ class Submission(models.Model):
 
     class Meta:
         db_table = 'submission'
-        unique_together = [['device', 'half_month']]
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
             models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['technician', 'device']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['technician', 'device', 'half_month'],
+                condition=~Q(status='Rejected'),
+                name='unique_submission_per_half_month_active'
+            )
         ]
 
     def __str__(self):
