@@ -86,7 +86,7 @@ def save_photo(file, submission_id, section, order_index):
     Args:
         file: UploadedFile object
         submission_id: ID of the submission
-        section: Photo section (1-3)
+        section: Photo section (1-5)
         order_index: Photo order within section
         
     Returns:
@@ -121,13 +121,14 @@ def save_photo(file, submission_id, section, order_index):
         raise FileHandlerError(f"Failed to save photo: {str(e)}")
 
 
-def save_submission_photos(files_dict, submission_id):
+def save_submission_photos(files_dict, submission_id, is_electrical=False):
     """
-    Save all 8 photos for a submission.
+    Save all photos for a submission (8 for default, 19 for electrical).
     
     Args:
         files_dict: Dictionary with photo files
         submission_id: ID of the submission
+        is_electrical: Boolean indicating if this is an electrical device submission
         
     Returns:
         list: List of dictionaries with photo info (section, order_index, file_path)
@@ -135,16 +136,46 @@ def save_submission_photos(files_dict, submission_id):
     Raises:
         FileHandlerError: If any photo save fails
     """
-    photo_mapping = [
-        ('section1_1', 1, 1),
-        ('section1_2', 1, 2),
-        ('section1_3', 1, 3),
-        ('section2_1', 2, 1),
-        ('section2_2', 2, 2),
-        ('section2_3', 2, 3),
-        ('section3_1', 3, 1),
-        ('section3_2', 3, 2),
-    ]
+    if is_electrical:
+        # Electrical: 5 sections (4+4+4+4+3 = 19 photos)
+        photo_mapping = [
+            # Section 1: 4 photos
+            ('section1_1', 1, 1),
+            ('section1_2', 1, 2),
+            ('section1_3', 1, 3),
+            ('section1_4', 1, 4),
+            # Section 2: 4 photos
+            ('section2_1', 2, 1),
+            ('section2_2', 2, 2),
+            ('section2_3', 2, 3),
+            ('section2_4', 2, 4),
+            # Section 3: 4 photos
+            ('section3_1', 3, 1),
+            ('section3_2', 3, 2),
+            ('section3_3', 3, 3),
+            ('section3_4', 3, 4),
+            # Section 4: 4 photos
+            ('section4_1', 4, 1),
+            ('section4_2', 4, 2),
+            ('section4_3', 4, 3),
+            ('section4_4', 4, 4),
+            # Section 5: 3 photos
+            ('section5_1', 5, 1),
+            ('section5_2', 5, 2),
+            ('section5_3', 5, 3),
+        ]
+    else:
+        # Default: 3 sections (3+3+2 = 8 photos)
+        photo_mapping = [
+            ('section1_1', 1, 1),
+            ('section1_2', 1, 2),
+            ('section1_3', 1, 3),
+            ('section2_1', 2, 1),
+            ('section2_2', 2, 2),
+            ('section2_3', 2, 3),
+            ('section3_1', 3, 1),
+            ('section3_2', 3, 2),
+        ]
     
     saved_photos = []
     

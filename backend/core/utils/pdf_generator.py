@@ -48,6 +48,11 @@ class PDFGenerator:
         self.pdf_path = None
         # Cache for image dimensions to avoid repeated PIL operations
         self._image_cache = {}
+        # Detect if this is an electrical device
+        gfm_problem_type = (submission.device.gfm_problem_type or '').lower()
+        self.is_electrical = (
+            'electro' in gfm_problem_type and 'mechanical' in gfm_problem_type
+        ) or 'electrical' in gfm_problem_type or submission.device.type == 'Electrical'
         
     def _preprocess_image(self, photo_path):
         """Preprocess a single image for faster rendering"""
@@ -115,34 +120,62 @@ class PDFGenerator:
             # Track equivalent media-relative directory for storage
             media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
             
-            # Generate PDF filename
-            filename = f"report_{self.submission.device.interaction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            # Generate PDF filename based on device type
+            device_prefix = 'Electro' if self.is_electrical else 'Cleaning'
+            filename = f"VisitReport_{device_prefix}_{self.submission.device.interaction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             self.pdf_path = os.path.join(pdf_dir, filename)
             self.relative_pdf_path = os.path.join(media_relative_dir, filename)
             
             # Create PDF canvas with landscape orientation
             c = canvas.Canvas(self.pdf_path, pagesize=landscape(A4))
             
-            # Generate each page with timing
+            # Generate pages based on device type
             page_start = time.time()
             self._generate_page1(c)  # Cover page
             logger.info(f"Page 1 generated in {time.time() - page_start:.2f}s")
             
-            page_start = time.time()
-            self._generate_page2(c)  # Section 1 photos
-            logger.info(f"Page 2 generated in {time.time() - page_start:.2f}s")
-            
-            page_start = time.time()
-            self._generate_page3(c)  # Section 2 photos
-            logger.info(f"Page 3 generated in {time.time() - page_start:.2f}s")
-            
-            page_start = time.time()
-            self._generate_page4(c)  # Section 3 photos
-            logger.info(f"Page 4 generated in {time.time() - page_start:.2f}s")
-            
-            page_start = time.time()
-            self._generate_page5(c)  # Checklist table
-            logger.info(f"Page 5 generated in {time.time() - page_start:.2f}s")
+            if self.is_electrical:
+                # Electrical: 5 photo sections + checklist = 6 pages
+                page_start = time.time()
+                self._generate_electrical_page2(c)  # Section 1: 4 photos (2x2)
+                logger.info(f"Page 2 (Electrical Section 1) generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_electrical_page3(c)  # Section 2: 4 photos (2x2)
+                logger.info(f"Page 3 (Electrical Section 2) generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_electrical_page4(c)  # Section 3: 4 photos (2x2)
+                logger.info(f"Page 4 (Electrical Section 3) generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_electrical_page5(c)  # Section 4: 4 photos (2x2)
+                logger.info(f"Page 5 (Electrical Section 4) generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_electrical_page6(c)  # Section 5: 3 photos
+                logger.info(f"Page 6 (Electrical Section 5) generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_page5(c)  # Checklist table (page 7 for electrical)
+                logger.info(f"Page 7 (Checklist) generated in {time.time() - page_start:.2f}s")
+            else:
+                # Default Cleaning: 3 photo sections + checklist = 5 pages
+                page_start = time.time()
+                self._generate_page2(c)  # Section 1 photos
+                logger.info(f"Page 2 generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_page3(c)  # Section 2 photos
+                logger.info(f"Page 3 generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_page4(c)  # Section 3 photos
+                logger.info(f"Page 4 generated in {time.time() - page_start:.2f}s")
+                
+                page_start = time.time()
+                self._generate_page5(c)  # Checklist table
+                logger.info(f"Page 5 generated in {time.time() - page_start:.2f}s")
             
             # Save PDF
             c.save()
@@ -193,10 +226,13 @@ class PDFGenerator:
             strip_width = self.width / num_strips
             c.rect(i * strip_width, 0, strip_width, self.height, fill=1, stroke=0)
         
-        # Title
+        # Title - conditional based on device type
         c.setFillColorRGB(1, 1, 1)  # White text
         c.setFont("Helvetica-Bold", 48)
-        c.drawString(40, self.height - 100, "PPM CLEANING REPORT")
+        if self.is_electrical:
+            c.drawString(40, self.height - 100, "PPM ELECTRO REPORT")
+        else:
+            c.drawString(40, self.height - 100, "PPM CLEANING REPORT")
         
         # Subtitle
         c.setFont("Helvetica", 24)
@@ -289,6 +325,146 @@ class PDFGenerator:
         
         c.showPage()
     
+    def _generate_electrical_page2(self, c):
+        """
+        Electrical Page 2: Section 1 photos (4 photos in 2x2 grid)
+        """
+        photos = self.submission.photos.filter(section=1).order_by('order_index')[:4]
+        
+        self._draw_vertical_sidebar(c, 
+            title="Electro. Site Machine",
+            instructions="Photos must be Nightly and clear, also showing machine and pylon from four sides from 3 to 5 meters away.",
+            note="Site Machine not Less than 4 Photos"
+        )
+        
+        self._draw_2x2_grid_photos(c, photos)
+        c.showPage()
+    
+    def _generate_electrical_page3(self, c):
+        """
+        Electrical Page 3: Section 2 photos (4 photos in 2x2 grid)
+        """
+        photos = self.submission.photos.filter(section=2).order_by('order_index')[:4]
+        
+        self._draw_vertical_sidebar(c,
+            title="Electro. Site Machine",
+            instructions="Photos must be Nightly and clear. Zoom in and out for front and back from 3 to 5 meters away.",
+            note="Site Machine not Less than 4 Photos"
+        )
+        
+        self._draw_2x2_grid_photos(c, photos)
+        c.showPage()
+    
+    def _generate_electrical_page4(self, c):
+        """
+        Electrical Page 4: Section 3 photos (4 photos in 2x2 grid)
+        """
+        photos = self.submission.photos.filter(section=3).order_by('order_index')[:4]
+        
+        self._draw_vertical_sidebar(c,
+            title="Electro. Equipment",
+            instructions="Photos must be clear, also showing HVAC Temperature, Power voltmeter, Internally Light & Externally Light.",
+            note="Equipment Photos Required"
+        )
+        
+        self._draw_2x2_grid_photos(c, photos)
+        c.showPage()
+    
+    def _generate_electrical_page5(self, c):
+        """
+        Electrical Page 5: Section 4 photos (4 photos in 2x2 grid)
+        """
+        photos = self.submission.photos.filter(section=4).order_by('order_index')[:4]
+        
+        self._draw_vertical_sidebar(c,
+            title="Electro. Components",
+            instructions="Photos for machine Screen, Keyboard, ATM Code, Kiosk and Pylon.",
+            note="Component Photos Required"
+        )
+        
+        self._draw_2x2_grid_photos(c, photos)
+        c.showPage()
+    
+    def _generate_electrical_page6(self, c):
+        """
+        Electrical Page 6: Section 5 photos (3 photos)
+        """
+        photos = self.submission.photos.filter(section=5).order_by('order_index')[:3]
+        
+        self._draw_vertical_sidebar(c,
+            title="Electro. Final Check",
+            instructions="Photos for machine Screen, Keyboard, ATM Code, Kiosk and Pylon.",
+            note="Final Check Photos Required"
+        )
+        
+        self._draw_full_height_photos(c, photos)
+        c.showPage()
+    
+    def _draw_2x2_grid_photos(self, c, photos):
+        """Draw 4 photos in a 2x2 grid layout (for electrical sections) with no gaps"""
+        # Calculate available space (excluding sidebar)
+        sidebar_width = 150
+        available_width = self.width - sidebar_width
+        available_height = self.height
+        
+        # Calculate photo dimensions for 2x2 grid (no spacing between photos)
+        photo_width = available_width / 2
+        photo_height = available_height / 2
+        
+        # Grid positions: [top-left, top-right, bottom-left, bottom-right]
+        # No spacing - photos are tightly aligned
+        positions = [
+            (0, photo_height),  # Top-left
+            (photo_width, photo_height),  # Top-right
+            (0, 0),  # Bottom-left
+            (photo_width, 0)  # Bottom-right
+        ]
+        
+        for i, photo in enumerate(photos):
+            if i >= 4:  # Only draw 4 photos max
+                break
+                
+            x, y = positions[i]
+            
+            try:
+                photo_path = os.path.join('media', photo.file_url)
+                
+                if os.path.exists(photo_path):
+                    try:
+                        # Draw image to fill entire grid cell - no gaps, no cropping
+                        # Image will be stretched to fit if aspect ratio doesn't match
+                        c.drawImage(photo_path, x, y, 
+                                  width=photo_width, height=photo_height, 
+                                  preserveAspectRatio=False, mask='auto')
+                        
+                        # Note: preserveAspectRatio=False allows image to stretch to fill
+                        # entire cell, eliminating gaps while keeping full image visible
+                    except Exception as img_error:
+                        logger.error(f"Error processing image {photo.id}: {str(img_error)}")
+                        # Draw error placeholder
+                        c.setFillColorRGB(0.9, 0.9, 0.9)
+                        c.rect(x, y, photo_width, photo_height, fill=1)
+                        c.setFillColorRGB(0.5, 0.5, 0.5)
+                        c.setFont("Helvetica", 12)
+                        c.drawCentredString(x + photo_width/2, y + photo_height/2, "Error loading image")
+                else:
+                    # Draw placeholder if photo not found
+                    logger.warning(f"Photo file not found: {photo_path}")
+                    c.setFillColorRGB(0.9, 0.9, 0.9)
+                    c.rect(x, y, photo_width, photo_height, fill=1)
+                    c.setFillColorRGB(0.5, 0.5, 0.5)
+                    c.setFont("Helvetica", 12)
+                    c.drawCentredString(x + photo_width/2, y + photo_height/2, "Photo not found")
+                    
+            except Exception as e:
+                logger.error(f"Error drawing photo {photo.id}: {str(e)}")
+                # Draw error placeholder
+                c.setFillColorRGB(0.9, 0.9, 0.9)
+                c.rect(x, y, photo_width, photo_height, fill=1)
+                c.setFillColorRGB(0.5, 0.5, 0.5)
+                c.setFont("Helvetica", 12)
+                c.drawCentredString(x + photo_width/2, y + photo_height/2, "Error loading photo")
+    
     def _generate_page5(self, c):
         """
         Page 5: Preventive Cleaning Checklist - matches reference image exactly
@@ -345,10 +521,13 @@ class PDFGenerator:
         except Exception as e:
             logger.warning(f"Could not load Picture2.jpg on page 5: {str(e)}")
         
-        # Title (aligned with logos)
+        # Title (aligned with logos) - conditional based on device type
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(content_width / 2, self.height - 25, "Preventive Cleaning Checklist")  # Aligned with logo center
+        if self.is_electrical:
+            c.drawCentredString(content_width / 2, self.height - 25, "Preventive Maintenance Checklist - Drive Up")  # Electrical title
+        else:
+            c.drawCentredString(content_width / 2, self.height - 25, "Preventive Cleaning Checklist")  # Cleaning title
         
         # Header table with ATM info
         y = self.height - 55
@@ -777,12 +956,15 @@ class PDFGenerator:
         c.drawCentredString(x + col_widths[2]/2, y + 6, "Type")
         x += col_widths[2]
         
-        # Cleaning value
+        # Type value - conditional based on device type
         c.setFillColorRGB(1, 1, 1)
         c.rect(x, y, col_widths[3], row_height, fill=1, stroke=1)
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica", 8)
-        c.drawCentredString(x + col_widths[3]/2, y + 6, "Cleaning")
+        if self.is_electrical:
+            c.drawCentredString(x + col_widths[3]/2, y + 6, "Electro")
+        else:
+            c.drawCentredString(x + col_widths[3]/2, y + 6, "Cleaning")
         x += col_widths[3]
         
         # Region (gray header)
@@ -813,12 +995,15 @@ class PDFGenerator:
         c.drawCentredString(x + col_widths[4]/2, y + 6, "City")
         x += col_widths[4]
         
-        # City value
+        # City value - conditional based on device type
         c.setFillColorRGB(1, 1, 1)
         c.rect(x, y, col_widths[5], row_height, fill=1, stroke=1)
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica", 8)
-        c.drawCentredString(x + col_widths[5]/2, y + 6, self.submission.device.city)
+        if self.is_electrical:
+            c.drawCentredString(x + col_widths[5]/2, y + 6, "Hail")
+        else:
+            c.drawCentredString(x + col_widths[5]/2, y + 6, self.submission.device.city)
         
         # Back to first row for remaining columns
         y += row_height
@@ -899,34 +1084,64 @@ class PDFGenerator:
         c.setFont("Helvetica-Bold", 8)
         c.drawCentredString(x + col_widths[3]/2, y - row_height/2 + 4, "Remarks")
         
-        # Data rows
+        # Data rows - conditional based on device type
         y -= row_height
-        items = [
-            ("Cleaning", True),
-            ("Inside Room & Glass", False),
-            ("Polishing Of Ground Tiles/Marble", False),
-            ("Inside Kiosk/Top of Kiosk", False),
-            ("A/C And Lighting Grills", False),
-            ("Totem", False),
-            ("Rust", False),
-            ("Drain Pipe", False),
-            ("Clean Ground Light", False),
-            ("Clean Pavement", False),
-            ("Branding", True),
-            ("Drive Thru", True),
-            ("Pylon (Logo, Letters, Sticker, Light, Acrylic and Posters)", False),
-            ("Kiosk (Logo, Letters, Sticker, Light, Acrylic and Posters)", False),
-            ("Unipolar & Canopy Sticker", False),
-            ("TID Plate", False),
-            ("QR Plate", False),
-            ("Lobby / Window", True),
-            ("Signage ( Logo – Letters )", False),
-            ("SNB Sticker", False),
-            ("Poster On Glass", False),
-            ("Trash Bin Fire Resister", False),
-            ("Kiosk (Logo – Letters – Posters – Acrylic )", False),
-            ("QR Plate", False),
-        ]
+        
+        if self.is_electrical:
+            # Electrical checklist - with category headers
+            items = [
+                ("[Air Conditioner (A/C)]", True),
+                ("Clean A/C Filter", False),
+                ("Check A/C Drainage", False),
+                ("Check For A/C Sound Vibration, Bearing", False),
+                ("Check A/C Temperature - With Picture", False),
+                ("[Electronically]", True),
+                ("Check And Clean Lamps / Switches", False),
+                ("Check And Clean Convenience Outlets", False),
+                ("Check And Clean Stabilizer / UPS", False),
+                ("Check And Clean Insider", False),
+                ("Check Timer and Retimed", False),
+                ("Change Busted Light", False),
+                ("Arrange Cable and Covered", False),
+                ("[Panel Boards]", True),
+                ("Check And Clean Panel Boards", False),
+                ("Retightening Of Wires and Cable Arrangements", False),
+                ("Neutral To Ground (Less Than 2v)", False),
+                ("[Carpentry / Civil Works]", True),
+                ("Check Door Hinges, Locks, Door Closer and Apply Grease", False),
+                ("Check For Holes and Cracks in The Cabinet", False),
+                ("Check Floor Tiles, Stairs, Paintings, Ceiling, And Glass, etc.", False),
+                ("Pavement Painting", False),
+                ("Check Asphalt, Boundary, Curb Stone, Security Poles", False),
+            ]
+        else:
+            # Cleaning checklist - with header rows
+            items = [
+                ("Cleaning", True),
+                ("Inside Room & Glass", False),
+                ("Polishing Of Ground Tiles/Marble", False),
+                ("Inside Kiosk/Top of Kiosk", False),
+                ("A/C And Lighting Grills", False),
+                ("Totem", False),
+                ("Rust", False),
+                ("Drain Pipe", False),
+                ("Clean Ground Light", False),
+                ("Clean Pavement", False),
+                ("Branding", True),
+                ("Drive Thru", True),
+                ("Pylon (Logo, Letters, Sticker, Light, Acrylic and Posters)", False),
+                ("Kiosk (Logo, Letters, Sticker, Light, Acrylic and Posters)", False),
+                ("Unipolar & Canopy Sticker", False),
+                ("TID Plate", False),
+                ("QR Plate", False),
+                ("Lobby / Window", True),
+                ("Signage ( Logo – Letters )", False),
+                ("SNB Sticker", False),
+                ("Poster On Glass", False),
+                ("Trash Bin Fire Resister", False),
+                ("Kiosk (Logo – Letters – Posters – Acrylic )", False),
+                ("QR Plate", False),
+            ]
         
         for item, is_header in items:
             y -= row_height
@@ -995,7 +1210,7 @@ class PDFGenerator:
         c.drawCentredString(10 + col_width/2, y + 8, "Technician / Supervisor")
         c.drawCentredString(10 + col_width + col_width/2, y + 8, "Project Manager")
         
-        # Name row
+        # Name row - conditional based on device type
         y -= row_height
         c.setFillColorRGB(0.85, 0.85, 0.85)
         c.rect(10, y, col_width, row_height, fill=1, stroke=1)
@@ -1003,7 +1218,10 @@ class PDFGenerator:
         
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica", 10)
-        c.drawCentredString(10 + col_width/2, y + 8, "Ahmad Javed")
+        if self.is_electrical:
+            c.drawCentredString(10 + col_width/2, y + 8, "M.ISHTIAQ")
+        else:
+            c.drawCentredString(10 + col_width/2, y + 8, "Ahmad Javed")
         c.drawCentredString(10 + col_width + col_width/2, y + 8, "Fahad Abdul Ghaffar")
     
     def _draw_remarks_table(self, c, y):

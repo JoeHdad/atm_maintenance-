@@ -214,8 +214,8 @@ class Photo(models.Model):
         help_text="Parent submission"
     )
     section = models.IntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(3)],
-        help_text="Photo section (1-3)"
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Photo section (1-5)"
     )
     file_url = models.URLField(
         max_length=500,

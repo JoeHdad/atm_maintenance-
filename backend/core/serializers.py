@@ -382,7 +382,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
             'gfm_cost_center': obj.device.gfm_cost_center,
             'city': obj.device.city,
             'region': obj.device.city,  # Using city as region for now
-            'type': obj.device.type
+            'type': obj.device.type,
+            'gfm_problem_type': obj.device.gfm_problem_type  # Required for electrical device detection
         }
 
 

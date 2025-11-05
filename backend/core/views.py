@@ -582,12 +582,30 @@ def submit_maintenance(request):
         
         validated_data = serializer.validated_data
         
-        # Check that all 8 photos are present
-        required_photos = [
-            'section1_1', 'section1_2', 'section1_3',
-            'section2_1', 'section2_2', 'section2_3',
-            'section3_1', 'section3_2'
-        ]
+        # Determine if this is an electrical device
+        device = validated_data['device']
+        gfm_problem_type = (device.gfm_problem_type or '').lower()
+        is_electrical = (
+            'electro' in gfm_problem_type and 'mechanical' in gfm_problem_type
+        ) or 'electrical' in gfm_problem_type or device.type == 'Electrical'
+        
+        # Check required photos based on device type
+        if is_electrical:
+            # Electrical: 19 photos (4+4+4+4+3)
+            required_photos = [
+                'section1_1', 'section1_2', 'section1_3', 'section1_4',
+                'section2_1', 'section2_2', 'section2_3', 'section2_4',
+                'section3_1', 'section3_2', 'section3_3', 'section3_4',
+                'section4_1', 'section4_2', 'section4_3', 'section4_4',
+                'section5_1', 'section5_2', 'section5_3'
+            ]
+        else:
+            # Default: 8 photos (3+3+2)
+            required_photos = [
+                'section1_1', 'section1_2', 'section1_3',
+                'section2_1', 'section2_2', 'section2_3',
+                'section3_1', 'section3_2'
+            ]
         
         missing_photos = []
         for photo_field in required_photos:
@@ -634,7 +652,7 @@ def submit_maintenance(request):
             from .utils.file_handler import save_submission_photos, FileHandlerError
             
             try:
-                saved_photos = save_submission_photos(request.FILES, submission.id)
+                saved_photos = save_submission_photos(request.FILES, submission.id, is_electrical=is_electrical)
                 
                 # Create Photo records
                 for photo_info in saved_photos:
