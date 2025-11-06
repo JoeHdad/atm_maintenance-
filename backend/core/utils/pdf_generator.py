@@ -84,7 +84,7 @@ class PDFGenerator:
     def _preload_all_images(self):
         """Preload and resize all images in parallel for faster rendering"""
         photos = self.submission.photos.all()
-        photo_paths = [os.path.join('media', photo.file_url) for photo in photos]
+        photo_paths = [os.path.join(settings.MEDIA_ROOT, photo.file_url) for photo in photos]
         
         # Process images in parallel using ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -120,12 +120,16 @@ class PDFGenerator:
             # Track equivalent media-relative directory for storage
             media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
             
-            # Generate PDF filename based on device type and cost center
-            if self.is_electrical:
+            # Generate PDF filename based on submission type and cost center
+            if self.submission.type == 'Cleaning1':
+                filename = f"CL1_{self.submission.device.gfm_cost_center}.pdf"
+            elif self.submission.type == 'Cleaning2':
+                filename = f"CL2_{self.submission.device.gfm_cost_center}.pdf"
+            elif self.submission.type == 'Electrical':
                 filename = f"Electro_{self.submission.device.gfm_cost_center}.pdf"
             else:
-                # For cleaning devices, use CL1 prefix (can be extended to CL2 logic later if needed)
-                filename = f"CL1_{self.submission.device.gfm_cost_center}.pdf"
+                # Fallback for other types
+                filename = f"ATM_Report_{self.submission.device.gfm_cost_center}_{datetime.now().strftime('%Y%m%d')}.pdf"
             self.pdf_path = os.path.join(pdf_dir, filename)
             self.relative_pdf_path = os.path.join(media_relative_dir, filename)
             
@@ -253,7 +257,7 @@ class PDFGenerator:
         
         # Picture1.jpg logo at bottom-left corner
         try:
-            logo_path = os.path.join('media', 'Picture1.jpg')
+            logo_path = os.path.join(settings.MEDIA_ROOT, 'Picture1.jpg')
             if os.path.exists(logo_path):
                 # Place logo at bottom-left with proper sizing
                 c.drawImage(logo_path, 40, 30, width=120, height=80, preserveAspectRatio=True, mask='auto')
@@ -435,7 +439,7 @@ class PDFGenerator:
             c.rect(x, y, photo_width, photo_height, fill=0, stroke=1)  # Border only, no fill
             
             try:
-                photo_path = os.path.join('media', photo.file_url)
+                photo_path = os.path.join(settings.MEDIA_ROOT, photo.file_url)
                 
                 if os.path.exists(photo_path):
                     try:
@@ -514,7 +518,7 @@ class PDFGenerator:
         
         # Picture1.jpg logo at top-left corner (flush with top)
         try:
-            logo1_path = os.path.join('media', 'Picture1.jpg')
+            logo1_path = os.path.join(settings.MEDIA_ROOT, 'Picture1.jpg')
             if os.path.exists(logo1_path):
                 logo1_width = 100
                 logo1_height = 40
@@ -527,7 +531,7 @@ class PDFGenerator:
         
         # SNB Logo at top right (flush with top)
         try:
-            logo2_path = os.path.join('media', 'Picture2.jpg')
+            logo2_path = os.path.join(settings.MEDIA_ROOT, 'Picture2.jpg')
             if os.path.exists(logo2_path):
                 logo_width = 100
                 logo_height = 40
@@ -743,7 +747,7 @@ class PDFGenerator:
             
             try:
                 # Get photo path
-                photo_path = os.path.join('media', photo.file_url)
+                photo_path = os.path.join(settings.MEDIA_ROOT, photo.file_url)
                 
                 if os.path.exists(photo_path):
                     try:
@@ -864,7 +868,7 @@ class PDFGenerator:
         for i, photo in enumerate(photos):
             try:
                 # Get photo path
-                photo_path = os.path.join('media', photo.file_url)
+                photo_path = os.path.join(settings.MEDIA_ROOT, photo.file_url)
                 
                 if os.path.exists(photo_path):
                     # Use preloaded image from cache

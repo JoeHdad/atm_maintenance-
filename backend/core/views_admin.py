@@ -29,6 +29,7 @@ def get_submissions(request):
         - status: Filter by status (Pending, Approved, Rejected, All)
         - city: Filter by city
         - technician_id: Filter by technician
+        - device_type: Filter by device type (Electrical, Cleaning1, Cleaning2, etc., All)
         - date_from: Filter by visit_date >= date_from (YYYY-MM-DD)
         - date_to: Filter by visit_date <= date_to (YYYY-MM-DD)
     
@@ -40,6 +41,7 @@ def get_submissions(request):
         submission_status = request.GET.get('status', None)
         city = request.GET.get('city', None)
         technician_id = request.GET.get('technician_id', None)
+        device_type = request.GET.get('device_type', None)
         date_from = request.GET.get('date_from', None)
         date_to = request.GET.get('date_to', None)
         
@@ -57,6 +59,9 @@ def get_submissions(request):
         
         if technician_id:
             queryset = queryset.filter(technician_id=technician_id)
+        
+        if device_type and device_type != 'All':
+            queryset = queryset.filter(device__type=device_type)
         
         if date_from:
             queryset = queryset.filter(visit_date__gte=date_from)

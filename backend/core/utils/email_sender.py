@@ -99,7 +99,17 @@ ATM Maintenance System
 
             if os.path.exists(pdf_path):
                 with open(pdf_path, 'rb') as pdf_file:
-                    pdf_filename = f"ATM_Report_{device.interaction_id}_{submission.created_at.strftime('%Y%m%d')}.pdf"
+                    # Generate filename based on submission type and cost center
+                    if submission.type == 'Cleaning1':
+                        pdf_filename = f"CL1_{device.gfm_cost_center}.pdf"
+                    elif submission.type == 'Cleaning2':
+                        pdf_filename = f"CL2_{device.gfm_cost_center}.pdf"
+                    elif submission.type == 'Electrical':
+                        pdf_filename = f"Electro_{device.gfm_cost_center}.pdf"
+                    else:
+                        # Fallback for other types
+                        pdf_filename = f"ATM_Report_{device.interaction_id}_{submission.created_at.strftime('%Y%m%d')}.pdf"
+                    
                     email.attach(pdf_filename, pdf_file.read(), 'application/pdf')
                     logger.info(f"PDF attached: {pdf_filename} at {pdf_path}")
             else:
