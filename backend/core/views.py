@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.db import transaction
+from django.views.decorators.csrf import csrf_exempt
 
 from .serializers import (
     LoginSerializer, 
@@ -25,6 +26,7 @@ import os
 from datetime import datetime
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):

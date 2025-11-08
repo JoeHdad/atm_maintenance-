@@ -30,7 +30,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,aroundh-ksa.com,www.aroundh-ksa.com',
+    default='localhost,127.0.0.1,aroundh-ksa.com,www.aroundh-ksa.com,atm-maintenance.onrender.com',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
@@ -152,13 +152,35 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = config('MEDIA_ROOT', default=BASE_DIR / 'media')
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000', cast=lambda v: [s.strip() for s in v.split(',')])
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)  # Set to False in production
+# Absolute media base URL for cross-domain serving
+# Used by serializers to build absolute URLs for media files
+# This allows Hostinger frontend to access Render backend media files
+MEDIA_BASE_URL = config(
+    'MEDIA_BASE_URL',
+    default='https://atm-maintenance.onrender.com' if not DEBUG else 'http://localhost:8000'
+)
+
+# CORS settings - Allow Hostinger frontend to access Render backend
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000,https://amanisafi.com,https://www.amanisafi.com',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
 
+# CORS headers to expose (allow frontend to read these headers)
+CORS_EXPOSE_HEADERS = [
+    'Content-Type',
+    'X-CSRFToken',
+]
+
 # CSRF settings for production
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000', cast=lambda v: [s.strip() for s in v.split(',')])
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000,https://amanisafi.com,https://www.amanisafi.com',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # REST Framework settings
 REST_FRAMEWORK = {

@@ -13,6 +13,7 @@ from .serializers import SubmissionSerializer
 from .permissions import IsSupervisor
 from .utils.pdf_generator import generate_pdf
 from .utils.email_sender import send_approval_email
+from .utils.media_url_builder import build_absolute_pdf_url
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def get_submissions(request):
             queryset = queryset.filter(visit_date__lte=date_to)
         
         # Serialize
-        serializer = SubmissionSerializer(queryset, many=True)
+        serializer = SubmissionSerializer(queryset, many=True, context={'request': request})
         
         return Response({
             'status': 'success',
@@ -101,7 +102,7 @@ def get_submission_detail(request, submission_id):
             'technician', 'device'
         ).prefetch_related('photos').get(id=submission_id)
         
-        serializer = SubmissionSerializer(submission)
+        serializer = SubmissionSerializer(submission, context={'request': request})
         
         return Response({
             'status': 'success',
@@ -177,7 +178,7 @@ def approve_submission(request, submission_id):
         thread.start()
         
         # Serialize response and return immediately
-        serializer = SubmissionSerializer(submission)
+        serializer = SubmissionSerializer(submission, context={'request': request})
         
         return Response({
             'status': 'success',
@@ -244,7 +245,7 @@ def reject_submission(request, submission_id):
         
         logger.info(f"Submission {submission_id} rejected by supervisor. Reason: {request.data['remarks'][:50]}...")
         
-        serializer = SubmissionSerializer(submission)
+        serializer = SubmissionSerializer(submission, context={'request': request})
         
         return Response({
             'status': 'success',
@@ -288,7 +289,7 @@ def preview_pdf(request, submission_id):
             return Response({
                 'status': 'success',
                 'message': 'PDF preview generated successfully',
-                'pdf_url': pdf_path
+                'pdf_url': build_absolute_pdf_url(pdf_path, request)
             }, status=status.HTTP_200_OK)
             
         except Exception as e:

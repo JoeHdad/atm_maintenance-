@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import User, Device, TechnicianDevice, Submission, Photo
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
+from .utils.media_url_builder import build_absolute_media_url, build_absolute_pdf_url
 
 
 class LoginSerializer(serializers.Serializer):
@@ -330,7 +331,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
 
 class PhotoSerializer(serializers.ModelSerializer):
     """
-    Serializer for Photo model.
+    Serializer for Photo model with absolute URLs for cross-domain media serving.
     """
     file_url = serializers.SerializerMethodField()
 
@@ -340,20 +341,35 @@ class PhotoSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_file_url(self, obj):
-        """Return normalized file URL for photo (with forward slashes for web)"""
-        # Normalize path separators for web URLs (convert backslashes to forward slashes)
-        normalized_path = obj.file_url.replace('\\', '/')
-        return normalized_path
+        """
+        Return absolute URL for photo file.
+        
+        Converts relative paths to absolute URLs pointing to the Render backend
+        so that Hostinger frontend can access media files across domains.
+        
+        Example: 'photos/123/image.jpg' -> 'https://atm-maintenance.onrender.com/media/photos/123/image.jpg'
+        """
+        if not obj.file_url:
+            return None
+        
+        # Get request from context if available
+        request = self.context.get('request')
+        
+        # Build absolute URL
+        absolute_url = build_absolute_media_url(obj.file_url, request)
+        
+        return absolute_url
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
     """
-    Serializer for Submission model with photos.
+    Serializer for Submission model with photos and absolute media URLs.
     """
     photos = PhotoSerializer(many=True, read_only=True)
     technician_name = serializers.CharField(source='technician.username', read_only=True)
     technician_city = serializers.CharField(source='technician.city', read_only=True)
     device_info = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -385,6 +401,26 @@ class SubmissionSerializer(serializers.ModelSerializer):
             'type': obj.device.type,
             'gfm_problem_type': obj.device.gfm_problem_type  # Required for electrical device detection
         }
+
+    def get_pdf_url(self, obj):
+        """
+        Return absolute URL for PDF file.
+        
+        Converts relative PDF paths to absolute URLs pointing to the Render backend
+        so that Hostinger frontend can access PDF files across domains.
+        
+        Example: 'pdfs/123/report.pdf' -> 'https://atm-maintenance.onrender.com/media/pdfs/123/report.pdf'
+        """
+        if not obj.pdf_url:
+            return None
+        
+        # Get request from context if available
+        request = self.context.get('request')
+        
+        # Build absolute URL
+        absolute_url = build_absolute_pdf_url(obj.pdf_url, request)
+        
+        return absolute_url
 
 
 class SubmissionCreateSerializer(serializers.Serializer):

@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import views
@@ -9,7 +10,7 @@ app_name = 'core'
 urlpatterns = [
     # Authentication endpoints
     path('auth/login/', views.login_view, name='login'),
-    path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/refresh/', csrf_exempt(TokenRefreshView.as_view()), name='token_refresh'),
     
     # Data Host endpoints
     path('host/technicians/', views.technicians_view, name='technicians'),
