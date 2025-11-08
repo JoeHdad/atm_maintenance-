@@ -49,7 +49,7 @@ def build_absolute_media_url(relative_path, request=None):
     Build an absolute URL for a media file.
     
     Args:
-        relative_path: Relative path to media file (e.g., 'photos/123/image.jpg')
+        relative_path: Relative path to media file (e.g., 'photos/123/image.jpg' or 'media/photos/123/image.jpg')
         request: Optional Django request object for context
         
     Returns:
@@ -60,6 +60,10 @@ def build_absolute_media_url(relative_path, request=None):
     
     # Normalize path separators (convert backslashes to forward slashes)
     normalized_path = str(relative_path).replace('\\', '/')
+    
+    # Remove 'media/' prefix if it exists (to avoid double /media/media/)
+    if normalized_path.startswith('media/'):
+        normalized_path = normalized_path[6:]  # Remove 'media/' (6 characters)
     
     # Get base URL
     base_url = get_media_base_url(request)

@@ -122,8 +122,9 @@ class PDFGenerator:
             os.makedirs(pdf_dir, exist_ok=True)
             logger.info(f"[PDFGenerator.generate] PDF directory created/verified")
 
-            # Track equivalent media-relative directory for storage
-            media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
+            # Track equivalent media-relative directory for storage (without 'media/' prefix)
+            # The 'media/' prefix is added by build_absolute_media_url()
+            media_relative_dir = os.path.join('pdfs', str(self.submission.id))
             
             # Generate PDF filename based on submission type and cost center
             if self.submission.type == 'Cleaning1':
