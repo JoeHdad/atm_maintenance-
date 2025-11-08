@@ -238,7 +238,7 @@ APPROVAL_EMAIL_RECIPIENTS = [
 ]
 
 # PDF storage directory
-PDF_BASE_DIR = r'C:\Users\ahmed\OneDrive\Desktop\VIBE CODING\Windsurf\atm-maintenance-system\backend\media\pdfs'
+PDF_BASE_DIR = os.path.join(MEDIA_ROOT, 'pdfs')
 
 # Logging Configuration
 LOGGING = {
