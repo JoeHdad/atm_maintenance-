@@ -277,34 +277,46 @@ def preview_pdf(request, submission_id):
         - pdf_url: URL to the generated preview PDF
         - message: Success message
     """
+    logger.info(f"[PDF Preview] Endpoint called for submission {submission_id}")
+    logger.info(f"[PDF Preview] Request method: {request.method}")
+    logger.info(f"[PDF Preview] User: {request.user}")
+    logger.info(f"[PDF Preview] User is authenticated: {request.user.is_authenticated}")
+    
     try:
         # Prefetch photos to avoid N+1 queries during PDF generation
+        logger.info(f"[PDF Preview] Fetching submission {submission_id}")
         submission = Submission.objects.select_related('device', 'technician').prefetch_related('photos').get(id=submission_id)
+        logger.info(f"[PDF Preview] Submission found: {submission.id}, Device: {submission.device.gfm_cost_center}, Photos: {submission.photos.count()}")
         
         # Generate PDF preview
         try:
+            logger.info(f"[PDF Preview] Starting PDF generation for submission {submission_id}")
             pdf_path = generate_pdf(submission)
-            logger.info(f"Preview PDF generated for submission {submission_id}: {pdf_path}")
+            logger.info(f"[PDF Preview] PDF generated successfully: {pdf_path}")
+            
+            absolute_url = build_absolute_pdf_url(pdf_path, request)
+            logger.info(f"[PDF Preview] Absolute URL built: {absolute_url}")
             
             return Response({
                 'status': 'success',
                 'message': 'PDF preview generated successfully',
-                'pdf_url': build_absolute_pdf_url(pdf_path, request)
+                'pdf_url': absolute_url
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f"PDF preview generation failed for submission {submission_id}: {str(e)}")
+            logger.error(f"[PDF Preview] PDF generation failed for submission {submission_id}: {str(e)}", exc_info=True)
             return Response({
                 'error': f'Failed to generate PDF preview: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     except Submission.DoesNotExist:
+        logger.error(f"[PDF Preview] Submission {submission_id} not found")
         return Response(
             {'error': 'Submission not found'},
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
-        logger.error(f"Error generating PDF preview for submission {submission_id}: {str(e)}")
+        logger.error(f"[PDF Preview] Unexpected error for submission {submission_id}: {str(e)}", exc_info=True)
         return Response(
             {'error': f'Failed to generate PDF preview: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

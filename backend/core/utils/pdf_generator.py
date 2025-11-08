@@ -107,15 +107,20 @@ class PDFGenerator:
         import time
         start_time = time.time()
         
+        logger.info(f"[PDFGenerator.generate] Starting PDF generation for submission {self.submission.id}")
+        
         try:
             # Preload all images in parallel before generating PDF
             preload_start = time.time()
+            logger.info(f"[PDFGenerator.generate] Preloading images...")
             self._preload_all_images()
-            logger.info(f"Images preloaded in {time.time() - preload_start:.2f}s")
+            logger.info(f"[PDFGenerator.generate] Images preloaded in {time.time() - preload_start:.2f}s")
             
             # Create PDF directory if it doesn't exist
             pdf_dir = os.path.join(settings.PDF_BASE_DIR, str(self.submission.id))
+            logger.info(f"[PDFGenerator.generate] PDF directory: {pdf_dir}")
             os.makedirs(pdf_dir, exist_ok=True)
+            logger.info(f"[PDFGenerator.generate] PDF directory created/verified")
 
             # Track equivalent media-relative directory for storage
             media_relative_dir = os.path.join('media', 'pdfs', str(self.submission.id))
@@ -1347,27 +1352,40 @@ def generate_pdf(submission):
     Raises:
         Exception: If PDF generation fails
     """
+    logger.info(f"[generate_pdf] Called for submission {submission.id}")
+    logger.info(f"[generate_pdf] Submission type: {submission.type}, Device: {submission.device.gfm_cost_center}")
+    
     try:
         # Check if PDF already exists and is recent (within last 5 minutes)
         if submission.pdf_url:
+            logger.info(f"[generate_pdf] Submission has existing pdf_url: {submission.pdf_url}")
             pdf_path = os.path.join(submission.pdf_url)
             if os.path.exists(pdf_path):
+                logger.info(f"[generate_pdf] PDF file exists at {pdf_path}")
                 # Check file modification time
                 file_mtime = os.path.getmtime(pdf_path)
                 current_time = datetime.now().timestamp()
                 # If PDF is less than 5 minutes old, reuse it
                 if (current_time - file_mtime) < 300:  # 300 seconds = 5 minutes
-                    logger.info(f"Reusing existing PDF for submission {submission.id}: {submission.pdf_url}")
+                    logger.info(f"[generate_pdf] Reusing existing PDF for submission {submission.id}: {submission.pdf_url}")
                     return submission.pdf_url
+            else:
+                logger.info(f"[generate_pdf] PDF file does not exist at {pdf_path}")
+        else:
+            logger.info(f"[generate_pdf] Submission has no existing pdf_url")
         
         # Generate new PDF with timeout protection (30 seconds max)
-        logger.info(f"Generating new PDF for submission {submission.id}")
+        logger.info(f"[generate_pdf] Generating new PDF for submission {submission.id}")
+        logger.info(f"[generate_pdf] PDF_BASE_DIR: {settings.PDF_BASE_DIR}")
+        logger.info(f"[generate_pdf] MEDIA_ROOT: {settings.MEDIA_ROOT}")
+        
         generator = PDFGenerator(submission)
         pdf_path = generator.generate()
+        logger.info(f"[generate_pdf] PDF generated successfully: {pdf_path}")
         return pdf_path
     except TimeoutException as e:
-        logger.error(f"PDF generation timed out for submission {submission.id}: {str(e)}")
+        logger.error(f"[generate_pdf] PDF generation timed out for submission {submission.id}: {str(e)}")
         raise Exception("PDF generation timed out. Please try again.")
     except Exception as e:
-        logger.error(f"PDF generation failed for submission {submission.id}: {str(e)}")
+        logger.error(f"[generate_pdf] PDF generation failed for submission {submission.id}: {str(e)}", exc_info=True)
         raise
