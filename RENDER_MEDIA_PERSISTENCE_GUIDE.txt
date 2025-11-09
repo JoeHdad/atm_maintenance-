@@ -1,0 +1,278 @@
+================================================================================
+RENDER MEDIA PERSISTENCE - DIAGNOSTIC & FIX GUIDE
+================================================================================
+
+PROBLEM SUMMARY:
+- Uploaded photos disappear after 15 minutes of inactivity
+- Admin sees 404 errors when trying to view photos
+- Files are being saved to ephemeral storage instead of persistent disk
+
+ROOT CAUSE:
+Django's MEDIA_ROOT was not properly reading the environment variable due to
+Path object vs string type mismatch. This caused files to be saved to the
+container's ephemeral filesystem instead of the persistent disk.
+
+================================================================================
+VERIFICATION STEPS FOR RENDER PRODUCTION
+================================================================================
+
+Step 1: Check Render Startup Logs
+----------------------------------
+After deployment, check Render logs for these lines:
+
+GOOD (Fixed):
+  [STARTUP] MEDIA_ROOT configured as: /var/data/media
+  [STARTUP] MEDIA_ROOT type: <class 'str'>
+  [STARTUP] MEDIA_ROOT exists: True
+  [STARTUP] Media directories initialized successfully
+
+BAD (Broken):
+  [STARTUP] MEDIA_ROOT configured as: /opt/render/project/src/backend/media
+  [STARTUP] MEDIA_ROOT type: <class 'pathlib.WindowsPath'>
+  [STARTUP] MEDIA_ROOT exists: True
+
+If you see the BAD output, the environment variable is not being read correctly.
+
+
+Step 2: Run Diagnostic Script on Render
+----------------------------------------
+SSH into Render container or use Render Shell:
+
+  cd /opt/render/project/src/backend
+  python verify_media_config.py
+
+Expected output:
+  [1] MEDIA_ROOT CONFIGURATION:
+      Value: /var/data/media
+      Type: <class 'str'>
+      Is String: True
+
+  [2] ENVIRONMENT VARIABLE:
+      MEDIA_ROOT env var: /var/data/media
+      Matches settings: True
+
+  [9] PERSISTENT DISK DETECTION:
+      ✓ MEDIA_ROOT points to persistent disk (/var/data)
+      ✓ Files should survive container restarts
+
+
+Step 3: Test File Upload
+-------------------------
+1. Login as technician
+2. Upload maintenance photos
+3. Check Render logs for:
+
+  [FILE_UPLOAD] MEDIA_ROOT: /var/data/media
+  [FILE_UPLOAD] Upload directory: /var/data/media/photos/10
+  [FILE_UPLOAD] Full file path: /var/data/media/photos/10/section1_1_abc123.jpg
+  [FILE_UPLOAD] File saved successfully: /var/data/media/photos/10/section1_1_abc123.jpg
+  [FILE_UPLOAD] File exists after save: True
+  [FILE_UPLOAD] File size: 123456 bytes
+
+If you see /opt/render/project/src/backend/media instead of /var/data/media,
+the fix has NOT been applied correctly.
+
+
+Step 4: Verify Persistent Disk Mount
+-------------------------------------
+Run the persistence test script:
+
+  cd /opt/render/project/src/backend
+  python test_persistent_disk.py
+
+Expected output:
+  [TEST 1] MEDIA_ROOT Configuration:
+    MEDIA_ROOT: /var/data/media
+    ✓ PASS: MEDIA_ROOT points to persistent disk
+
+  [TEST 2] Persistent Disk Mount:
+    ✓ PASS: /var/data exists
+    Readable: True
+    Writable: True
+
+  [TEST 5] Write Test:
+    ✓ PASS: File written successfully
+    Path: /var/data/media/test_persistence_20251109_200000.txt
+
+
+Step 5: Test Container Restart Persistence
+-------------------------------------------
+1. Note the test file path from Step 4
+2. Wait 20+ minutes (container will sleep)
+3. Access admin page to wake container
+4. SSH back into container
+5. Check if test file still exists:
+
+  ls -la /var/data/media/test_persistence_*.txt
+
+If file exists: ✓ Persistent disk is working
+If file missing: ✗ Files are being saved to ephemeral storage
+
+
+Step 6: Test Photo Persistence
+-------------------------------
+1. Upload photos as technician
+2. Note the submission ID (e.g., 10)
+3. View photos as admin - should load successfully
+4. Wait 20+ minutes (container sleeps)
+5. Access admin page again
+6. View same photos - should STILL load successfully
+
+If photos load after restart: ✓ Fix is working
+If 404 errors: ✗ Fix not applied or disk not mounted
+
+
+================================================================================
+CONFIGURATION CHECKLIST
+================================================================================
+
+✓ render.yaml Configuration:
+  - Persistent disk defined:
+      disk:
+        name: media-storage
+        mountPath: /var/data
+        sizeGB: 1
+  
+  - MEDIA_ROOT environment variable set:
+      - key: MEDIA_ROOT
+        value: /var/data/media
+
+✓ Django settings.py:
+  - MEDIA_ROOT converts Path to string:
+      MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
+  
+  - Startup logging added to verify configuration
+  - Media directories auto-created on startup
+
+✓ File upload handler:
+  - Logging added to track save locations
+  - Files saved to settings.MEDIA_ROOT
+  - Verification after save
+
+✓ URL serving:
+  - Production media serving configured in urls.py
+  - re_path with serve() function for /media/ URLs
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Issue: MEDIA_ROOT still shows /opt/render/project/src/backend/media
+Fix: 
+  1. Verify MEDIA_ROOT env var is set in Render dashboard
+  2. Redeploy the service
+  3. Check startup logs for MEDIA_ROOT value
+
+Issue: /var/data does not exist
+Fix:
+  1. Verify disk is defined in render.yaml
+  2. Check Render dashboard for disk attachment
+  3. May need to recreate service with disk configuration
+
+Issue: Permission denied when writing to /var/data/media
+Fix:
+  1. Check disk mount permissions
+  2. Ensure Django process has write access
+  3. May need to adjust file permissions
+
+Issue: Files still disappear after 15 minutes
+Fix:
+  1. Verify files are being saved to /var/data/media (check logs)
+  2. Run test_persistent_disk.py to verify disk mount
+  3. Check if disk is actually persistent (not ephemeral)
+
+Issue: 404 errors even though files exist
+Fix:
+  1. Check Django media serving configuration in urls.py
+  2. Verify MEDIA_URL is set correctly (/media/)
+  3. Check CORS settings for cross-origin requests
+
+
+================================================================================
+EXPECTED BEHAVIOR AFTER FIX
+================================================================================
+
+✓ Startup:
+  - Logs show MEDIA_ROOT = /var/data/media
+  - All subdirectories created automatically
+  - Disk mount verified
+
+✓ File Upload:
+  - Files saved to /var/data/media/photos/{submission_id}/
+  - Logs confirm save location
+  - File existence verified after save
+
+✓ Immediate Access:
+  - Photos load successfully in admin view
+  - URLs return 200 OK
+  - No 404 errors
+
+✓ After Container Sleep (15+ min):
+  - Container wakes up
+  - Photos STILL load successfully
+  - No 404 errors
+  - All previously uploaded files accessible
+
+✓ After Redeploy:
+  - All uploaded files remain accessible
+  - No data loss
+  - Persistent disk preserves all media
+
+
+================================================================================
+MONITORING & MAINTENANCE
+================================================================================
+
+Regular Checks:
+1. Monitor Render logs for [FILE_UPLOAD] messages
+2. Verify all uploads go to /var/data/media
+3. Check disk usage periodically
+4. Test photo access after container restarts
+
+Disk Space Management:
+- 1GB persistent disk provided
+- Monitor usage in Render dashboard
+- Implement cleanup policy for old files if needed
+- Consider upgrading disk size if approaching limit
+
+Log Monitoring:
+- Watch for 404 errors in Render logs
+- Check [STARTUP] logs after each deployment
+- Verify [FILE_UPLOAD] paths are correct
+- Alert on any /opt/render/project paths in logs
+
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+If issues persist after following this guide:
+1. Collect Render logs (startup + file upload)
+2. Run both diagnostic scripts
+3. Check Render dashboard for disk status
+4. Verify environment variables are set correctly
+5. Contact Render support if disk mount issues
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+The fix ensures that:
+1. MEDIA_ROOT reads environment variable correctly (string type)
+2. Files are saved to persistent disk (/var/data/media)
+3. Comprehensive logging tracks all file operations
+4. Directories are auto-created on startup
+5. Files survive container restarts and redeployments
+
+Key files modified:
+- backend/atm_backend/settings.py (MEDIA_ROOT fix + logging)
+- backend/core/utils/file_handler.py (upload logging)
+- render.yaml (persistent disk + env var)
+
+Diagnostic tools provided:
+- verify_media_config.py (configuration check)
+- test_persistent_disk.py (persistence test)
+
+================================================================================
