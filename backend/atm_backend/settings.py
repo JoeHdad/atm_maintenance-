@@ -304,3 +304,17 @@ LOGGING = {
 logs_dir = BASE_DIR / 'logs'
 if not os.path.exists(logs_dir):
     os.makedirs(logs_dir)
+
+# Create media directory if it doesn't exist (important for persistent disk)
+media_dir = MEDIA_ROOT
+if not os.path.exists(media_dir):
+    os.makedirs(media_dir)
+
+# Create subdirectories for organization
+photos_dir = os.path.join(MEDIA_ROOT, 'photos')
+pdfs_dir = os.path.join(MEDIA_ROOT, 'pdfs')
+excel_dir = os.path.join(MEDIA_ROOT, 'excel_uploads')
+
+for directory in [photos_dir, pdfs_dir, excel_dir]:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
