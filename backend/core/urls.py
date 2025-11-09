@@ -14,6 +14,7 @@ urlpatterns = [
     
     # Data Host endpoints
     path('host/technicians/', views.technicians_view, name='technicians'),
+    path('host/technicians/<int:technician_id>/', views.delete_technician, name='delete_technician'),
     path('host/technicians/<int:technician_id>/uploaded-types', views.get_uploaded_types, name='get_uploaded_types'),
     path('host/technicians/<int:technician_id>/uploaded-files', views.get_uploaded_files, name='get_uploaded_files'),
     path('host/upload-excel', views.upload_excel, name='upload_excel'),

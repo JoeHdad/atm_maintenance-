@@ -103,6 +103,117 @@ def technicians_view(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['DELETE'])
+@permission_classes([IsDataHost])
+def delete_technician(request, technician_id):
+    """
+    Delete a technician and all related data (cascading delete).
+    Only accessible by Data Host users.
+    
+    DELETE /api/host/technicians/<id>/
+    
+    Deletes:
+        - Technician user account
+        - All TechnicianDevice assignments (CASCADE)
+        - All Submissions by this technician (CASCADE)
+        - All Photos in those submissions (CASCADE)
+        - All ExcelUpload records (CASCADE)
+        - Physical files (photos, PDFs, Excel files)
+    
+    Response:
+        - message: Success message
+        - deleted_data: Summary of deleted items
+    """
+    try:
+        # Get the technician
+        technician = User.objects.filter(id=technician_id, role='technician').first()
+        
+        if not technician:
+            return Response(
+                {'error': 'Technician not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Collect statistics before deletion
+        from .models import TechnicianDevice, Submission, Photo, ExcelUpload
+        
+        device_assignments_count = TechnicianDevice.objects.filter(technician=technician).count()
+        submissions_count = Submission.objects.filter(technician=technician).count()
+        excel_uploads_count = ExcelUpload.objects.filter(technician=technician).count()
+        
+        # Get all submissions to delete their physical files
+        submissions = Submission.objects.filter(technician=technician).select_related('device')
+        
+        # Delete physical PDF files
+        import os
+        from django.conf import settings
+        deleted_pdfs = 0
+        for submission in submissions:
+            if submission.pdf_url:
+                # Extract relative path from URL
+                pdf_path = submission.pdf_url.replace('/media/', '')
+                full_pdf_path = os.path.join(settings.MEDIA_ROOT, pdf_path)
+                if os.path.exists(full_pdf_path):
+                    try:
+                        os.remove(full_pdf_path)
+                        deleted_pdfs += 1
+                    except Exception as e:
+                        print(f"Error deleting PDF {full_pdf_path}: {str(e)}")
+        
+        # Delete physical photo files
+        photos = Photo.objects.filter(submission__technician=technician)
+        deleted_photos = 0
+        for photo in photos:
+            if photo.file_url:
+                # Extract relative path from URL
+                photo_path = photo.file_url.replace('/media/', '')
+                full_photo_path = os.path.join(settings.MEDIA_ROOT, photo_path)
+                if os.path.exists(full_photo_path):
+                    try:
+                        os.remove(full_photo_path)
+                        deleted_photos += 1
+                    except Exception as e:
+                        print(f"Error deleting photo {full_photo_path}: {str(e)}")
+        
+        # Delete physical Excel files
+        excel_uploads = ExcelUpload.objects.filter(technician=technician)
+        deleted_excel_files = 0
+        for upload in excel_uploads:
+            if upload.file_path:
+                full_excel_path = os.path.join(settings.MEDIA_ROOT, upload.file_path)
+                if os.path.exists(full_excel_path):
+                    try:
+                        os.remove(full_excel_path)
+                        deleted_excel_files += 1
+                    except Exception as e:
+                        print(f"Error deleting Excel file {full_excel_path}: {str(e)}")
+        
+        # Delete the technician (CASCADE will handle related records)
+        technician_username = technician.username
+        technician.delete()
+        
+        # Return success response with deletion summary
+        return Response({
+            'message': f'Technician "{technician_username}" and all related data deleted successfully',
+            'deleted_data': {
+                'device_assignments': device_assignments_count,
+                'submissions': submissions_count,
+                'excel_uploads': excel_uploads_count,
+                'physical_files': {
+                    'pdfs': deleted_pdfs,
+                    'photos': deleted_photos,
+                    'excel_files': deleted_excel_files
+                }
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to delete technician: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['POST'])
 @permission_classes([IsDataHost])
 def upload_excel(request):
