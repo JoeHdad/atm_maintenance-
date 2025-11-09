@@ -151,7 +151,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = config('MEDIA_ROOT', default=BASE_DIR / 'media')
+# Use environment variable if set (Render persistent disk), otherwise use local media folder
+# Convert to string to ensure consistency
+MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 
 # Absolute media base URL for cross-domain serving
 # Used by serializers to build absolute URLs for media files
@@ -307,8 +309,16 @@ if not os.path.exists(logs_dir):
 
 # Create media directory if it doesn't exist (important for persistent disk)
 media_dir = MEDIA_ROOT
+print(f"[STARTUP] MEDIA_ROOT configured as: {MEDIA_ROOT}")
+print(f"[STARTUP] MEDIA_ROOT type: {type(MEDIA_ROOT)}")
+print(f"[STARTUP] MEDIA_ROOT exists: {os.path.exists(media_dir)}")
+
 if not os.path.exists(media_dir):
+    print(f"[STARTUP] Creating MEDIA_ROOT directory: {media_dir}")
     os.makedirs(media_dir)
+    print(f"[STARTUP] MEDIA_ROOT directory created successfully")
+else:
+    print(f"[STARTUP] MEDIA_ROOT directory already exists")
 
 # Create subdirectories for organization
 photos_dir = os.path.join(MEDIA_ROOT, 'photos')
@@ -317,4 +327,9 @@ excel_dir = os.path.join(MEDIA_ROOT, 'excel_uploads')
 
 for directory in [photos_dir, pdfs_dir, excel_dir]:
     if not os.path.exists(directory):
+        print(f"[STARTUP] Creating subdirectory: {directory}")
         os.makedirs(directory)
+    else:
+        print(f"[STARTUP] Subdirectory exists: {directory}")
+
+print(f"[STARTUP] Media directories initialized successfully")

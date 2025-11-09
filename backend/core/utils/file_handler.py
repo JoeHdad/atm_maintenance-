@@ -101,20 +101,29 @@ def save_photo(file, submission_id, section, order_index):
         
         # Create directory structure: /media/photos/{submission_id}/
         upload_dir = os.path.join(settings.MEDIA_ROOT, 'photos', str(submission_id))
+        print(f"[FILE_UPLOAD] MEDIA_ROOT: {settings.MEDIA_ROOT}")
+        print(f"[FILE_UPLOAD] Upload directory: {upload_dir}")
         os.makedirs(upload_dir, exist_ok=True)
+        print(f"[FILE_UPLOAD] Directory created/verified: {upload_dir}")
         
         # Generate unique filename with section and order
         file_extension = os.path.splitext(file.name)[1].lower()
         unique_filename = f"section{section}_{order_index}_{uuid.uuid4().hex[:8]}{file_extension}"
         file_path = os.path.join(upload_dir, unique_filename)
+        print(f"[FILE_UPLOAD] Full file path: {file_path}")
         
         # Save file to disk
         with open(file_path, 'wb+') as destination:
             for chunk in file.chunks():
                 destination.write(chunk)
         
+        print(f"[FILE_UPLOAD] File saved successfully: {file_path}")
+        print(f"[FILE_UPLOAD] File exists after save: {os.path.exists(file_path)}")
+        print(f"[FILE_UPLOAD] File size: {os.path.getsize(file_path)} bytes")
+        
         # Return relative path for database storage
         relative_path = os.path.join('photos', str(submission_id), unique_filename)
+        print(f"[FILE_UPLOAD] Relative path for DB: {relative_path}")
         return relative_path
         
     except Exception as e:
