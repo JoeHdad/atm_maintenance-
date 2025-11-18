@@ -39,11 +39,11 @@ Create a file named `test_devices.xlsx` with these exact columns and data:
 - [ ] No console errors
 
 ### Steps (continued):
-5. [ ] Navigate to: `http://localhost:3000/upload-excel`
+5. [❌ ] Navigate to: `http://localhost:3000/upload-excel`
 
 ### Expected Results:
-- [ ] Excel upload page loads
-- [ ] Page title shows "Upload Device Excel File"
+- [ ❌] Excel upload page loads
+- [ ❌] Page title shows "Upload Device Excel File"
 - [ ] No console errors
 
 **Result**: ☐ PASS  ☐ FAIL  
@@ -55,20 +55,20 @@ Create a file named `test_devices.xlsx` with these exact columns and data:
 
 ### Check these elements are present:
 
-- [ ] Page header with title "Upload Device Excel File"
-- [ ] Description text below title
-- [ ] Yellow warning banner with icon
-- [ ] Warning text: "This will replace all existing devices for this technician"
-- [ ] Technician dropdown label: "Select Technician *"
-- [ ] Technician dropdown with placeholder "-- Select a technician --"
-- [ ] Device Type dropdown label: "Device Type *"
-- [ ] Device Type dropdown with options: Cleaning, Electrical
-- [ ] File upload area with drag-and-drop zone
-- [ ] Upload icon in file area
-- [ ] Text: "Click to upload or drag and drop"
-- [ ] Text: "Excel files only (.xlsx, .xls)"
-- [ ] Upload button: "Upload Excel File"
-- [ ] Upload button is disabled (gray)
+- [❌ ] Page header with title "Upload Device Excel File"
+- [ ❌] Description text below title
+- [ ❌] Yellow warning banner with icon
+- [ ❌] Warning text: "This will replace all existing devices for this technician"
+- [ ❌] Technician dropdown label: "Select Technician *"
+- [ ❌] Technician dropdown with placeholder "-- Select a technician --"
+- [ ❌] Device Type dropdown label: "Device Type *"
+- [ ❌] Device Type dropdown with options: Cleaning, Electrical
+- [ ❌] File upload area with drag-and-drop zone
+- [ ❌] Upload icon in file area
+- [ ❌] Text: "Click to upload or drag and drop"
+- [ ❌] Text: "Excel files only (.xlsx, .xls)"
+- [ ❌] Upload button: "Upload Excel File"
+- [ ❌] Upload button is disabled (gray)
 
 **Result**: ☐ PASS  ☐ FAIL  
 **Notes**: _______________________________________________
@@ -81,19 +81,19 @@ Create a file named `test_devices.xlsx` with these exact columns and data:
 1. [ ] Click on "Select Technician" dropdown
 
 ### Expected Results:
-- [ ] Dropdown opens
-- [ ] Shows at least 3 technicians:
+- [❌ ] Dropdown opens
+- [❌ ] Shows at least 3 technicians:
   - [ ] test_tech_riyadh - Riyadh
   - [ ] test_tech_jeddah - Jeddah
   - [ ] test_tech_dammam - Dammam
-- [ ] Technicians are formatted as "username - city"
+- [❌ ] Technicians are formatted as "username - city"
 
 ### Steps (continued):
-2. [ ] Select "test_tech_riyadh - Riyadh"
+2. [ ❌] Select "test_tech_riyadh - Riyadh"
 
 ### Expected Results:
-- [ ] Selection is saved
-- [ ] Upload button still disabled
+- [❌ ] Selection is saved
+- [❌ ] Upload button still disabled
 
 **Result**: ☐ PASS  ☐ FAIL  
 **Notes**: _______________________________________________

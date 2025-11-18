@@ -1,0 +1,115 @@
+Phase 5 (Integration) depends on Phases 1-4 completion
+**PHASE 5: INTEGRATION & TESTING**
+
+#### **Feature 5.1: Role-Based Routing & Navigation**
+**Purpose**: Integrate all three dashboards with proper routing and role-based access.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/best-practices.md and /instructions/security-guidelines.md.
+
+Create the main app routing and role-based navigation.
+
+Requirements:
+1. Update App.jsx with React Router:
+   - Public routes: /login
+   - Protected routes:
+     * /host/* → HostDashboard (IsDataHost)
+     * /technician/* → TechnicianDashboard (IsTechnician)
+     * /supervisor/* → SupervisorDashboard (IsSupervisor)
+   - Redirect to appropriate dashboard after login based on role
+   - Redirect to /login if token expired or invalid
+2. Add role-based redirection:
+   - After login, check user.role and redirect:
+     * host → /host/dashboard
+     * technician → /technician/devices
+     * supervisor → /supervisor/submissions
+3. Add 404 page for undefined routes
+
+⚠️ Do NOT modify individual dashboard components.
+⚠️ Do NOT add new features.
+Only routing and access control integration.
+
+Output: App.jsx, routes.js, NotFound.jsx
+```
+
+---
+
+#### **Feature 5.2: Error Handling & Validation Layer**
+**Purpose**: Add comprehensive error handling across frontend and backend.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/security-guidelines.md and /instructions/best-practices.md.
+
+Add comprehensive error handling and validation.
+
+Backend Requirements:
+1. Create custom exception handlers (Django):
+   - ValidationError → 400 with clear messages
+   - PermissionError → 403 with message
+   - NotFound → 404
+   - ServerError → 500
+2. Add request validation middleware
+3. Add logging for all errors
+
+Frontend Requirements:
+1. Create ErrorBoundary component (React)
+2. Create Toast notification system for success/error messages
+3. Add API error interceptor in axios/fetch
+4. Handle common errors:
+   - Network errors
+   - Token expiration (redirect to login)
+   - Validation errors (show in form)
+   - Server errors (show user-friendly message)
+
+⚠️ Do NOT change existing API logic.
+⚠️ Do NOT modify database models.
+Only add error handling layers.
+
+Output: 
+Backend: utils/error_handlers.py, middleware.py
+Frontend: ErrorBoundary.jsx, Toast.jsx, api/interceptors.js
+```
+
+---
+
+#### **Feature 5.3: Environment Configuration & Deployment Prep**
+**Purpose**: Set up environment variables and prepare for localhost deployment.
+
+**AI Agent Prompt**:
+```
+Refer to /instructions/stack-overview.md.
+
+Configure environment variables and deployment settings.
+
+Requirements:
+1. Create .env.example files for both frontend and backend
+2. Backend environment variables:
+   - DATABASE_URL
+   - SECRET_KEY
+   - JWT_SECRET_KEY
+   - EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD
+   - MEDIA_ROOT, STATIC_ROOT
+   - DEBUG (True for localhost)
+3. Frontend environment variables:
+   - REACT_APP_API_URL (http://localhost:8000/api)
+4. Update Django settings.py:
+   - Load environment variables using python-decouple
+   - Configure CORS for localhost
+   - Configure static/media file serving
+5. Create docker-compose.yml (optional):
+   - PostgreSQL service
+   - Django service
+   - React service
+6. Create README.md with setup instructions:
+   - How to install dependencies
+   - How to set up database
+   - How to run migrations
+   - How to run development servers
+
+⚠️ Do NOT deploy to production.
+⚠️ Do NOT modify application logic.
+Only configuration and documentation.
+
+Output: .env.example (x2), settings.py updates, docker-compose.yml, README.md
